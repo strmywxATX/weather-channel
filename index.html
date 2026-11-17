@@ -65,12 +65,12 @@ h1 span{color:var(--gold)}
   </div>
 </header>
 <div class="legends">
-  <div class="legend"><h2>250 mb jet stream <em id="jetSrc">loading</em></h2><div class="bar" id="jetBar"></div><div class="ticks" style="display:grid;grid-template-columns:repeat(8,1fr)"><span>30</span><span>40</span><span>50</span><span>60</span><span>80</span><span>100</span><span>125</span><span>150</span></div></div>
+  <div class="legend"><h2>250 mb jet stream <em id="jetSrc">loading</em></h2><div class="bar" id="jetBar"></div><div class="ticks" style="display:grid;grid-template-columns:repeat(6,1fr)"><span>50</span><span>60</span><span>80</span><span>100</span><span>125</span><span>150</span></div></div>
   <div class="legend"><h2>Radar <em id="radSrc">loading</em></h2><div class="bar" id="radBar"></div><div class="ticks"><span>15</span><span>25</span><span>35</span><span>45</span><span>55</span><span>65</span></div></div>
-  <div class="legend"><h2>Surface temperature <em id="tmpSrc">loading</em></h2><div class="bar" id="tmpBar"></div><div class="ticks"><span>0</span><span>20</span><span>40</span><span>60</span><span>80</span><span>100</span></div></div>
+  <div class="legend"><h2>Surface observations <em id="tmpSrc">loading</em></h2></div>
 </div>
 <div class="controls">
-  <label for="cTemp"><input type="checkbox" id="cTemp" checked>Temperature</label>
+  <label for="cTemp"><input type="checkbox" id="cTemp" checked>Temperature readings</label>
   <label for="cBarb"><input type="checkbox" id="cBarb" checked>Wind barbs at ASOS sites</label>
   <label for="cRad"><input type="checkbox" id="cRad" checked>Radar</label>
   <label for="cJet"><input type="checkbox" id="cJet" checked>Jet stream layer</label>
@@ -93,7 +93,7 @@ let jetExag=25;
 const TEMP=[[-10,[217,211,230]],[0,[167,155,196]],[10,[125,121,176]],[20,[95,119,168]],[30,[95,147,179]],[40,[111,175,181]],[50,[127,181,156]],[60,[169,190,134]],[70,[214,201,127]],[80,[214,166,109]],[90,[196,122,90]],[100,[165,82,77]],[110,[124,58,69]]];
 const RAD=[[15,[3,0,244]],[20,[2,253,2]],[25,[1,197,1]],[30,[0,142,0]],[35,[253,248,2]],[40,[229,188,0]],[45,[253,149,0]],[50,[253,0,0]],[55,[212,0,0]],[60,[188,0,0]],[65,[248,0,253]]];
 /* isotach bands follow the UCAR/RAL upper-air maps: 30, 40, 50, 60, 80, 100, 125, 150 kt */
-const JET=[[30,[255,250,200,.22]],[40,[255,240,60,.3]],[50,[255,154,46,.5]],[60,[255,200,50,.56]],[80,[255,160,160,.66]],[100,[255,100,100,.74]],[125,[240,20,20,.82]],[150,[255,0,200,.88]]];
+const JET=[[50,[255,154,46,.25]],[60,[255,200,50,.28]],[80,[255,160,160,.33]],[100,[255,100,100,.37]],[125,[240,20,20,.41]],[150,[255,0,200,.44]]];
 function ramp(stops,v){
   if(v<=stops[0][0])return stops[0][1];
   for(let i=1;i<stops.length;i++){if(v<=stops[i][0]){const a=stops[i-1],b=stops[i],t=(v-a[0])/(b[0]-a[0]);return a[1].map((c,k)=>c+(b[1][k]-c)*t);}}
@@ -101,8 +101,7 @@ function ramp(stops,v){
 }
 function step(stops,v){let c=null;for(const s of stops){if(v>=s[0])c=s[1];}return c;}
 const css=c=>'rgb('+c.slice(0,3).map(Math.round).join(',')+')';
-document.getElementById('tmpBar').style.background='linear-gradient(90deg,'+TEMP.filter(s=>s[0]>=0&&s[0]<=100).map(s=>css(s[1])+' '+s[0]+'%').join(',')+')';
-document.getElementById('jetBar').style.background='linear-gradient(90deg,'+JET.map((s,i)=>css(s[1])+' '+(i*100/8)+'%,'+css(s[1])+' '+((i+1)*100/8)+'%').join(',')+')';
+document.getElementById('jetBar').style.background='linear-gradient(90deg,'+JET.map((s,i)=>css(s[1])+' '+(i*100/6)+'%,'+css(s[1])+' '+((i+1)*100/6)+'%').join(',')+')';
 document.getElementById('radBar').style.background='linear-gradient(90deg,'+RAD.map((s,i)=>css(s[1])+' '+(i*10)+'%,'+css(s[1])+' '+((i+1)*10)+'%').join(',')+')';
 
 /* ---------- demo weather (stand-ins for RTMA, MRMS and RAP until the live feed exists) ---------- */
@@ -214,7 +213,7 @@ const glow=new THREE.Mesh(new THREE.SphereGeometry(1.13,64,48),new THREE.ShaderM
   side:THREE.BackSide,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false}));
 scene.add(glow);
 
-const OCEAN='#0a1f3d',LAND='#33402f';
+const OCEAN='#0a1f3d',LAND='#5d6b4f';
 const regCv=document.createElement('canvas');regCv.width=(REG.E-REG.W)*REG.ppd;regCv.height=(REG.N-REG.S)*REG.ppd;
 const regTex=new THREE.CanvasTexture(regCv);regTex.anisotropy=renderer.capabilities.getMaxAnisotropy();
 const jetCv=document.createElement('canvas');jetCv.width=1560;jetCv.height=900;
@@ -334,13 +333,8 @@ Promise.all([getJ('data/boundaries.json'),getJ('data/stations.json'),getImg('dat
     const c=regCv.getContext('2d'),W=regCv.width,H=regCv.height,on=id=>document.getElementById(id).checked;
     c.globalAlpha=1;c.fillStyle=OCEAN;c.fillRect(0,0,W,H);
     c.fillStyle=LAND;c.fill(land,'evenodd');
-    if(on('cTemp')){
-      c.imageSmoothingQuality='high';
-      c.globalAlpha=.3;c.drawImage(tc,0,0,W,H);
-      c.save();c.clip(land,'evenodd');c.globalAlpha=.8;c.drawImage(tc,0,0,W,H);c.restore();
-      c.save();c.clip(lakes,'evenodd');c.globalAlpha=1;c.fillStyle=OCEAN;c.fillRect(0,0,W,H);c.globalAlpha=.3;c.drawImage(tc,0,0,W,H);c.restore();
-    }else{c.fillStyle=OCEAN;c.fill(lakes,'evenodd');}
-    if(shade){c.save();c.clip(land,'evenodd');c.globalCompositeOperation='overlay';c.globalAlpha=.95;c.imageSmoothingQuality='high';c.drawImage(shade,0,0,W,H);c.restore();c.save();c.clip(lakes,'evenodd');c.fillStyle=OCEAN;c.globalAlpha=1;c.fillRect(0,0,W,H);if(on('cTemp')){c.globalAlpha=.3;c.drawImage(tc,0,0,W,H);}c.restore();}
+    c.fillStyle=OCEAN;c.fill(lakes,'evenodd');
+    if(shade){c.save();c.clip(land,'evenodd');c.globalCompositeOperation='overlay';c.globalAlpha=.95;c.imageSmoothingQuality='high';c.drawImage(shade,0,0,W,H);c.restore();c.save();c.clip(lakes,'evenodd');c.fillStyle=OCEAN;c.globalAlpha=1;c.fillRect(0,0,W,H);c.restore();}
     c.globalAlpha=1;c.globalCompositeOperation='source-over';
     c.strokeStyle='rgba(8,14,26,.55)';c.lineWidth=1.6;c.stroke(states);
     c.strokeStyle='rgba(8,14,26,.85)';c.lineWidth=2.6;c.stroke(countries);c.lineWidth=2.2;c.stroke(land);c.lineWidth=1.4;c.stroke(lakes);
@@ -349,6 +343,15 @@ Promise.all([getJ('data/boundaries.json'),getJ('data/stations.json'),getImg('dat
       const list=LIVE.asos?LIVE.asos.stations:ST.map(q=>{const wv=sfcWind(q[1],q[2]);return {lat:q[1],lon:q[2],u:wv[0],v:wv[1]};});
       for(const q of list){drawBarb(c,X(q.lon),Y(q.lat),q.lat,q.u,q.v);
         c.save();c.translate(X(q.lon),Y(q.lat));c.scale(1/Math.cos(q.lat*D2R),1);c.beginPath();c.arc(0,0,3.6,0,Math.PI*2);c.fillStyle='#fff';c.fill();c.lineWidth=1.5;c.strokeStyle='rgba(5,10,20,.85)';c.stroke();c.restore();}
+    }
+    /* air temperature at a spread of ASOS stations, upper left of the station as on a station plot */
+    if(on('cTemp')&&LIVE.asos){
+      const pick=[];
+      for(const q of LIVE.asos.stations){if(q.t==null)continue;const cc=Math.cos(q.lat*D2R);if(pick.every(k=>Math.hypot((q.lon-k.lon)*cc,q.lat-k.lat)>=3.2))pick.push(q);}
+      c.font='600 32px "Barlow Condensed","Arial Narrow",sans-serif';c.textAlign='right';c.lineJoin='round';
+      for(const q of pick){c.save();c.translate(X(q.lon),Y(q.lat));c.scale(1/Math.cos(q.lat*D2R),1);const tx=String(Math.round(q.t));
+        c.lineWidth=7;c.strokeStyle='rgba(5,10,20,.9)';c.strokeText(tx,-7,-7);c.fillStyle='#ffe7a0';c.fillText(tx,-7,-7);c.restore();}
+      c.textAlign='left';
     }
     /* Texas State marker */
     const mx=X(-97.94),my=Y(29.89);
@@ -362,7 +365,7 @@ Promise.all([getJ('data/boundaries.json'),getJ('data/stations.json'),getImg('dat
   function labels(){
     const r=LIVE.rap,a=LIVE.asos,rd=LIVE.radar,demo=[];
     document.getElementById('jetSrc').textContent=r?'RAP analysis '+zt(r.valid)+', knots; lines are heights':'demo data, knots';if(!r)demo.push('jet stream');
-    document.getElementById('tmpSrc').textContent=(r&&r.t?'RAP analysis '+zt(r.valid):'demo data')+', \u00b0F; barbs '+(a?'ASOS '+zt(a.time):'demo');if(!(r&&r.t))demo.push('temperature');if(!a)demo.push('winds');
+    document.getElementById('tmpSrc').textContent=a?'ASOS '+zt(a.time)+': wind barbs, temperature \u00b0F':'demo winds';if(!a)demo.push('winds');
     document.getElementById('radSrc').textContent=rd?'NEXRAD composite '+zt(rd.m.time)+', dBZ':'demo data, dBZ';if(!rd)demo.push('radar');
     const b=document.getElementById('demoBadge');b.hidden=!demo.length;b.textContent='Demo data: '+demo.join(', ');
   }
@@ -370,7 +373,7 @@ Promise.all([getJ('data/boundaries.json'),getJ('data/stations.json'),getImg('dat
     const t='?t='+Date.now(),opt=u=>getJ(u+t).catch(()=>null);
     return Promise.all([opt('live/rap.json'),opt('live/asos.json'),opt('live/radar.json').then(m=>m?getImg('live/radar.png'+t).then(img=>img?{m,img}:null):null)]).then(([rap,asos,radar])=>{
       LIVE.rap=rap&&rap.u&&rap.v?rap:null;LIVE.asos=asos&&asos.stations&&asos.stations.length?asos:null;LIVE.radar=radar;
-      buildTemp();buildRadar();redraw();buildJetTexture();buildTethers();labels();jetGroup.visible=document.getElementById('cJet').checked;
+      buildRadar();redraw();buildJetTexture();buildTethers();labels();jetGroup.visible=document.getElementById('cJet').checked;
     });
   }
   loadLive();setInterval(loadLive,300000);
