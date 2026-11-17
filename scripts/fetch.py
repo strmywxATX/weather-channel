@@ -338,7 +338,8 @@ def headlines():
         if ev in by and shown < 5:
             st = sorted(by[ev]["states"])
             where = ", ".join(st) if len(st) <= 6 else f"{len(st)} states"
-            items.append(f"{ev}{'s' if by[ev]['n'] != 1 else ''} in effect: {by[ev]['n']} ({where})")
+            plural = ev if by[ev]["n"] == 1 else (ev[:-1] + "ies" if ev.endswith("y") else ev + ("es" if ev.endswith("ch") else "s"))
+            items.append(f"{plural} in effect: {by[ev]['n']} ({where})")
             shown += 1
     if tx:
         ranked = sorted(tx, key=lambda e: PRIORITY.index(e) if e in PRIORITY else 99)[:4]
@@ -347,7 +348,7 @@ def headlines():
         items.append("No active weather alerts in Texas")
     try:
         rap_ = json.load(open(os.path.join(OUT, "rap.json")))
-        best = max(((math.hypot(u, v), k) for k, (u, v) in enumerate(zip(rap_["u"], rap_["v"])) if u is not None and v is not None))
+        best = max(((math.hypot(u, v), k) for k, (u, v) in enumerate(zip(rap_["u"], rap_["v"])) if u is not None and v is not None and -140 <= rap_["W"] + (k % rap_["nx"]) * rap_["d"] <= -60))
         j, i = divmod(best[1], rap_["nx"])
         la, lo = rap_["N"] - j * rap_["d"], rap_["W"] + i * rap_["d"]
         items.append(f"Strongest 250 mb wind on the map: {round(best[0])} kt near {abs(la):.0f}°N, {abs(lo):.0f}°W")
