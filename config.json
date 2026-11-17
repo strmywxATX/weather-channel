@@ -1,5 +1,9 @@
 {
-  "lectures": [],
+  "lectures": [
+    {"campus": "rr", "days": ["Mon", "Wed"], "start": "12:30"},
+    {"campus": "sm", "days": ["Tue", "Thu"], "start": "09:30"}
+  ],
+  "defaultCampus": "sm",
   "headlines": [],
   "rotateSeconds": 20,
   "video": ""

@@ -279,11 +279,9 @@ def forecast():
 
 # ---------------------------------------------------------------- satellite loop, WPC fronts, SPC outlook (copied as images)
 IMAGES = {
-    "sat.gif": ["https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/sp/GEOCOLOR/GOES19-SP-GEOCOLOR-600x600.gif",
-                "https://cdn.star.nesdis.noaa.gov/GOES19/ABI/CONUS/GEOCOLOR/GOES19-CONUS-GEOCOLOR-625x375.gif",
-                "https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/sp/GEOCOLOR/GOES16-SP-GEOCOLOR-600x600.gif"],
-    "wpc.gif": ["https://www.wpc.ncep.noaa.gov/noaa/noaad1.gif"],
-    "spc.gif": ["https://www.spc.noaa.gov/products/outlook/day1otlk.gif", "https://www.spc.noaa.gov/products/outlook/day1otlk.png"],
+    "sat.gif": ["https://cdn.star.nesdis.noaa.gov/GOES19/ABI/CONUS/GEOCOLOR/GOES19-CONUS-GEOCOLOR-625x375.gif",
+                "https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/sp/GEOCOLOR/GOES19-SP-GEOCOLOR-600x600.gif"],
+    "wpc.jpg": ["https://www.wpc.ncep.noaa.gov/basicwx/91fndfd.jpg"],
 }
 
 
