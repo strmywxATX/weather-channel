@@ -35,6 +35,13 @@ jobs:
           # start from the last published live data, so a failed source keeps its last good file
           if git fetch --depth 1 origin gh-pages 2>/dev/null; then
             git archive FETCH_HEAD live 2>/dev/null | tar -x -C site || true
+            git archive FETCH_HEAD relief 2>/dev/null | tar -x -C site || true
+          fi
+
+      - name: Build the relief image (first run only)
+        run: |
+          if [ ! -s site/relief/elev.png ]; then
+            python scripts/build_relief.py site/relief || echo "relief build failed; the page falls back to the coarse shading"
           fi
 
       - name: Fetch live data
