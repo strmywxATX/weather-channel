@@ -93,7 +93,7 @@ def rap():
 
     lines = [l.split(":") for l in idx.strip().splitlines()]
     offsets = sorted({int(l[1]) for l in lines})
-    want = ("UGRD:250 mb", "VGRD:250 mb", "TMP:2 m above ground")
+    want = ("UGRD:250 mb", "VGRD:250 mb", "HGT:250 mb", "TMP:2 m above ground")
     starts = sorted({int(l[1]) for l in lines if f"{l[3]}:{l[4]}" in want})
     blob = b""
     for s0 in starts:
@@ -106,7 +106,7 @@ def rap():
     with tempfile.NamedTemporaryFile(suffix=".grib2", delete=False) as f:
         f.write(blob)
         path = f.name
-    u = v = tk = None
+    u = v = tk = hgt = None
     seen = []
     grbs = pygrib.open(path)
     for g in grbs:
@@ -115,6 +115,8 @@ def rap():
             u, ref = g.values, g
         elif g.typeOfLevel == "isobaricInhPa" and g.level == 250 and g.shortName == "v":
             v = g.values
+        elif g.typeOfLevel == "isobaricInhPa" and g.level == 250 and g.shortName in ("gh", "z"):
+            hgt = g.values if g.shortName == "gh" else g.values / 9.80665
         elif g.typeOfLevel == "heightAboveGround" and g.level == 2:
             tk = g.values
     if u is None or v is None:
@@ -129,12 +131,17 @@ def rap():
         u, v = u * np.cos(rot) + v * np.sin(rot), -u * np.sin(rot) + v * np.cos(rot)
 
     fields = [np.asarray(u) * 1.94384, np.asarray(v) * 1.94384]
+    names = ["u", "v"]
+    if hgt is not None:
+        fields.append(np.asarray(hgt))
+        names.append("z")
     if tk is not None:
         fields.append((np.asarray(tk) - 273.15) * 9 / 5 + 32)
+        names.append("t")
     nx, ny, out = regrid(lats, lons, fields)
     # Light smoothing of the wind (about one grid cell) so the isotach contours draw cleanly.
     from scipy.ndimage import gaussian_filter
-    for i in (0, 1):
+    for i in [k for k, nm in enumerate(names) if nm != "t"]:
         a = out[i].reshape(ny, nx)
         ok = ~np.isnan(a)
         num = gaussian_filter(np.where(ok, a, 0.0), 1.0)
@@ -142,12 +149,12 @@ def rap():
         out[i] = np.where(ok, num / np.maximum(den, 1e-6), np.nan).ravel()
     ints = lambda a: [None if x != x else round(float(x), 1) for x in a.tolist()]
     valid = ref.validDate.replace(tzinfo=UTC).strftime("%Y-%m-%dT%H:%MZ")
-    obj = {**GRID, "nx": nx, "ny": ny, "valid": valid, "u": ints(out[0]), "v": ints(out[1])}
-    if tk is not None:
-        obj["t"] = ints(out[2])
+    obj = {**GRID, "nx": nx, "ny": ny, "valid": valid}
+    for nm, a in zip(names, out):
+        obj[nm] = ints(a)  # u, v in knots; z = 250 mb height in metres; t in deg F
     save("rap.json", obj)
     spd = np.hypot(out[0], out[1])
-    return {"valid": valid, "grid": ref.gridType, "max_250mb_kt": int(np.nanmax(spd)), "has_temp": tk is not None, "messages": seen}
+    return {"valid": valid, "grid": ref.gridType, "max_250mb_kt": int(np.nanmax(spd)), "has_temp": tk is not None, "has_height": hgt is not None, "messages": seen}
 
 
 # ---------------------------------------------------------------- ASOS winds

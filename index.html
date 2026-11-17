@@ -65,7 +65,7 @@ h1 span{color:var(--gold)}
   </div>
 </header>
 <div class="legends">
-  <div class="legend"><h2>250 mb jet stream <em id="jetSrc">loading</em></h2><div class="bar" id="jetBar"></div><div class="ticks"><span>50</span><span>75</span><span>100</span><span>125</span><span>150</span><span>175</span><span>200</span></div></div>
+  <div class="legend"><h2>250 mb jet stream <em id="jetSrc">loading</em></h2><div class="bar" id="jetBar"></div><div class="ticks" style="display:grid;grid-template-columns:repeat(8,1fr)"><span>30</span><span>40</span><span>50</span><span>60</span><span>80</span><span>100</span><span>125</span><span>150</span></div></div>
   <div class="legend"><h2>Radar <em id="radSrc">loading</em></h2><div class="bar" id="radBar"></div><div class="ticks"><span>15</span><span>25</span><span>35</span><span>45</span><span>55</span><span>65</span></div></div>
   <div class="legend"><h2>Surface temperature <em id="tmpSrc">loading</em></h2><div class="bar" id="tmpBar"></div><div class="ticks"><span>0</span><span>20</span><span>40</span><span>60</span><span>80</span><span>100</span></div></div>
 </div>
@@ -74,7 +74,7 @@ h1 span{color:var(--gold)}
   <label for="cBarb"><input type="checkbox" id="cBarb" checked>Wind barbs at ASOS sites</label>
   <label for="cRad"><input type="checkbox" id="cRad" checked>Radar</label>
   <label for="cJet"><input type="checkbox" id="cJet" checked>Jet stream layer</label>
-  <label for="jetH" style="flex-direction:column;align-items:stretch;gap:3px;cursor:default"><span>Jet layer height: <span id="jetHv">70</span>&times; true scale</span><input type="range" id="jetH" min="10" max="80" step="5" value="70"></label>
+  <label for="jetH" style="flex-direction:column;align-items:stretch;gap:3px;cursor:default"><span>Jet layer height: <span id="jetHv">25</span>&times; true scale</span><input type="range" id="jetH" min="10" max="80" step="5" value="25"></label>
   <p class="hint">Drag to turn the globe. Scroll to zoom. Your view is remembered in this browser.</p>
   <p class="hint" id="viewOut" style="font-variant-numeric:tabular-nums;color:var(--text)"></p>
   <button type="button" id="copyView">Copy view settings</button>
@@ -87,12 +87,13 @@ h1 span{color:var(--gold)}
 const D2R=Math.PI/180;
 const REG={W:-170,E:-40,S:5,N:80,ppd:24};
 const TRUE_H=10.4/6371; // 250 mb is about 10.4 km up; Earth radius 6371 km
-let jetExag=70;
+let jetExag=25;
 
 /* ---------- colour ramps ---------- */
 const TEMP=[[-10,[217,211,230]],[0,[167,155,196]],[10,[125,121,176]],[20,[95,119,168]],[30,[95,147,179]],[40,[111,175,181]],[50,[127,181,156]],[60,[169,190,134]],[70,[214,201,127]],[80,[214,166,109]],[90,[196,122,90]],[100,[165,82,77]],[110,[124,58,69]]];
 const RAD=[[15,[3,0,244]],[20,[2,253,2]],[25,[1,197,1]],[30,[0,142,0]],[35,[253,248,2]],[40,[229,188,0]],[45,[253,149,0]],[50,[253,0,0]],[55,[212,0,0]],[60,[188,0,0]],[65,[248,0,253]]];
-const JET=[[50,[120,200,255,.28]],[75,[88,183,255,.48]],[100,[124,124,255,.62]],[125,[192,92,255,.72]],[150,[255,79,216,.82]],[175,[255,255,255,.88]]];
+/* isotach bands follow the UCAR/RAL upper-air maps: 30, 40, 50, 60, 80, 100, 125, 150 kt */
+const JET=[[30,[255,250,200,.22]],[40,[255,240,60,.3]],[50,[255,154,46,.5]],[60,[255,200,50,.56]],[80,[255,160,160,.66]],[100,[255,100,100,.74]],[125,[240,20,20,.82]],[150,[255,0,200,.88]]];
 function ramp(stops,v){
   if(v<=stops[0][0])return stops[0][1];
   for(let i=1;i<stops.length;i++){if(v<=stops[i][0]){const a=stops[i-1],b=stops[i],t=(v-a[0])/(b[0]-a[0]);return a[1].map((c,k)=>c+(b[1][k]-c)*t);}}
@@ -101,7 +102,7 @@ function ramp(stops,v){
 function step(stops,v){let c=null;for(const s of stops){if(v>=s[0])c=s[1];}return c;}
 const css=c=>'rgb('+c.slice(0,3).map(Math.round).join(',')+')';
 document.getElementById('tmpBar').style.background='linear-gradient(90deg,'+TEMP.filter(s=>s[0]>=0&&s[0]<=100).map(s=>css(s[1])+' '+s[0]+'%').join(',')+')';
-document.getElementById('jetBar').style.background='linear-gradient(90deg,'+JET.map((s,i)=>css(s[1])+' '+(i*100/6)+'%,'+css(s[1])+' '+((i+1)*100/6)+'%').join(',')+')';
+document.getElementById('jetBar').style.background='linear-gradient(90deg,'+JET.map((s,i)=>css(s[1])+' '+(i*100/8)+'%,'+css(s[1])+' '+((i+1)*100/8)+'%').join(',')+')';
 document.getElementById('radBar').style.background='linear-gradient(90deg,'+RAD.map((s,i)=>css(s[1])+' '+(i*10)+'%,'+css(s[1])+' '+((i+1)*10)+'%').join(',')+')';
 
 /* ---------- demo weather (stand-ins for RTMA, MRMS and RAP until the live feed exists) ---------- */
@@ -198,7 +199,7 @@ try{renderer=new THREE.WebGLRenderer({canvas,antialias:true});}catch(e){document
 renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
 const scene=new THREE.Scene();
 const camera=new THREE.PerspectiveCamera(36,1,.05,50);
-const view={lat:18.7,lon:-97.9,dist:1.7,tLat:33,tLon:-97.9};
+const view={lat:19.8,lon:-100.1,dist:1.89,tLat:33,tLon:-100.1};
 try{const sv=JSON.parse(localStorage.getItem('wxGlobeView')||'null');if(sv&&isFinite(sv.lat)&&isFinite(sv.lon)&&isFinite(sv.dist)){view.lat=sv.lat;view.lon=sv.lon;view.tLon=sv.lon;view.dist=sv.dist;if(sv.jet>=10&&sv.jet<=80){jetExag=sv.jet;document.getElementById('jetH').value=sv.jet;document.getElementById('jetHv').textContent=sv.jet;}}}catch(e){}
 function viewText(){return 'view lat '+view.lat.toFixed(1)+', lon '+view.lon.toFixed(1)+', zoom '+view.dist.toFixed(2)+', jet '+jetExag+'x';}
 function saveView(){document.getElementById('viewOut').textContent=viewText();try{localStorage.setItem('wxGlobeView',JSON.stringify({lat:view.lat,lon:view.lon,dist:view.dist,jet:jetExag}));}catch(e){}}
@@ -224,23 +225,22 @@ const jetGroup=new THREE.Group();jetGroup.add(jetMesh);scene.add(jetGroup);jetGr
 
 /* jet shell texture: isotach bands every 25 kt with contour lines, so jet streak cores and their entrance and exit regions stand out; a faint graticule makes it read as a sheet above the ground */
 function buildJetTexture(){
-  const w=jetCv.width,h=jetCv.height,g=jetCv.getContext('2d'),im=g.createImageData(w,h),band=new Int8Array(w*h);
+  const w=jetCv.width,h=jetCv.height,g=jetCv.getContext('2d'),im=g.createImageData(w,h),band=new Int8Array(w*h),lev=new Int16Array(w*h);
+  const hasZ=!!(LIVE.rap&&LIVE.rap.z),CI=120; /* height contours every 12 dm, as on the UCAR maps */
   for(let j=0;j<h;j++)for(let i=0;i<w;i++){
     const lat=REG.N-(j+.5)/h*(REG.N-REG.S),lon=REG.W+(i+.5)/w*(REG.E-REG.W),sp=jetWind(lat,lon)[2];
-    band[j*w+i]=sp<50?-1:Math.min(5,Math.floor((sp-50)/25));
+    let bd=-1;for(let q=0;q<JET.length;q++)if(sp>=JET[q][0])bd=q;band[j*w+i]=bd;
+    if(hasZ){const z=gridAt(LIVE.rap,LIVE.rap.z,lat,lon);lev[j*w+i]=z===z?Math.floor(z/CI):-1;}
   }
-  for(let j=0;j<h;j++)for(let i=0;i<w;i++){
+  const cross=(k,d,s)=>lev[k-d*s]>=0&&lev[k+d*s]>=0&&lev[k-d*s]!==lev[k+d*s];
+  for(let j=4;j<h-4;j++)for(let i=4;i<w-4;i++){
     const k=j*w+i,bd=band[k],o=k*4,lon=REG.W+(i+.5)/w*(REG.E-REG.W),edge=Math.max(0,Math.min(1,(lon-REG.W)/12,(REG.E-lon)/12));
-    const line=i>1&&j>1&&(band[k-1]!==bd||band[k-2]!==bd||band[k-w]!==bd||band[k-2*w]!==bd);
-    if(line&&(bd>=0||band[k-2]>=0||band[k-2*w]>=0)){im.data[o]=255;im.data[o+1]=255;im.data[o+2]=255;im.data[o+3]=190*edge;continue;}
+    if(hasZ&&(cross(k,1,1)||cross(k,1,w))){im.data[o]=12;im.data[o+1]=18;im.data[o+2]=32;im.data[o+3]=245*edge;continue;}
+    if(hasZ&&(cross(k,3,1)||cross(k,3,w))){im.data[o]=255;im.data[o+1]=255;im.data[o+2]=255;im.data[o+3]=150*edge;continue;}
     if(bd<0)continue;
-    const col=JET[bd][1];im.data[o]=col[0];im.data[o+1]=col[1];im.data[o+2]=col[2];im.data[o+3]=255*col[3]*.62*edge;
+    const col=JET[bd][1];im.data[o]=col[0];im.data[o+1]=col[1];im.data[o+2]=col[2];im.data[o+3]=255*col[3]*edge;
   }
-  g.putImageData(im,0,0);
-  g.strokeStyle='rgba(170,205,255,.16)';g.lineWidth=1.5;g.beginPath();
-  for(let lon=-160;lon<=-50;lon+=10){const x=(lon-REG.W)/(REG.E-REG.W)*w;g.moveTo(x,h*.07);g.lineTo(x,h*.8);}
-  for(let lat=20;lat<=70;lat+=10){const y=(REG.N-lat)/(REG.N-REG.S)*h;g.moveTo(w*.08,y);g.lineTo(w*.92,y);}
-  g.stroke();jetTex.needsUpdate=true;
+  g.putImageData(im,0,0);jetTex.needsUpdate=true;
 }
 buildJetTexture();
 
@@ -361,7 +361,7 @@ Promise.all([getJ('data/boundaries.json'),getJ('data/stations.json'),getImg('dat
   const zt=iso=>{const d=new Date(iso);return isNaN(d)?'':String(d.getUTCHours()).padStart(2,'0')+String(d.getUTCMinutes()).padStart(2,'0')+'Z';};
   function labels(){
     const r=LIVE.rap,a=LIVE.asos,rd=LIVE.radar,demo=[];
-    document.getElementById('jetSrc').textContent=r?'RAP analysis '+zt(r.valid)+', knots':'demo data, knots';if(!r)demo.push('jet stream');
+    document.getElementById('jetSrc').textContent=r?'RAP analysis '+zt(r.valid)+', knots; lines are heights':'demo data, knots';if(!r)demo.push('jet stream');
     document.getElementById('tmpSrc').textContent=(r&&r.t?'RAP analysis '+zt(r.valid):'demo data')+', \u00b0F; barbs '+(a?'ASOS '+zt(a.time):'demo');if(!(r&&r.t))demo.push('temperature');if(!a)demo.push('winds');
     document.getElementById('radSrc').textContent=rd?'NEXRAD composite '+zt(rd.m.time)+', dBZ':'demo data, dBZ';if(!rd)demo.push('radar');
     const b=document.getElementById('demoBadge');b.hidden=!demo.length;b.textContent='Demo data: '+demo.join(', ');
