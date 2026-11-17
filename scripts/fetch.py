@@ -132,7 +132,15 @@ def rap():
     if tk is not None:
         fields.append((np.asarray(tk) - 273.15) * 9 / 5 + 32)
     nx, ny, out = regrid(lats, lons, fields)
-    ints = lambda a: [None if x != x else int(round(x)) for x in a.tolist()]
+    # Light smoothing of the wind (about one grid cell) so the isotach contours draw cleanly.
+    from scipy.ndimage import gaussian_filter
+    for i in (0, 1):
+        a = out[i].reshape(ny, nx)
+        ok = ~np.isnan(a)
+        num = gaussian_filter(np.where(ok, a, 0.0), 1.0)
+        den = gaussian_filter(ok.astype(float), 1.0)
+        out[i] = np.where(ok, num / np.maximum(den, 1e-6), np.nan).ravel()
+    ints = lambda a: [None if x != x else round(float(x), 1) for x in a.tolist()]
     valid = ref.validDate.replace(tzinfo=UTC).strftime("%Y-%m-%dT%H:%MZ")
     obj = {**GRID, "nx": nx, "ny": ny, "valid": valid, "u": ints(out[0]), "v": ints(out[1])}
     if tk is not None:
