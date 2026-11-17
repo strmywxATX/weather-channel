@@ -29,7 +29,7 @@ jobs:
       - name: Assemble the site
         run: |
           mkdir -p site/live
-          cp index.html site/
+          cp index.html config.json site/
           cp -r data site/data
           touch site/.nojekyll
           # start from the last published live data, so a failed source keeps its last good file
