@@ -141,7 +141,7 @@ function jetWindDemo(lat,lon){
 
 /* ---------- live data (written by the scheduled job into live/); each layer falls back to the demo if its file is missing ---------- */
 const LIVE={rap:null,asos:null,radar:null};
-const RELIEF={exaggeration:5,gain:1.1,strength:.9};
+const RELIEF={exaggeration:5,gain:1.9,strength:1};
 function gridAt(g,arr,lat,lon){
   const x=(lon-g.W)/g.d,y=(g.N-lat)/g.d;if(!(x>=0&&y>=0&&x<=g.nx-1&&y<=g.ny-1))return NaN;
   const i=Math.min(g.nx-2,Math.floor(x)),j=Math.min(g.ny-2,Math.floor(y)),fx=x-i,fy=y-j,k=j*g.nx+i,a=arr[k],b=arr[k+1],c=arr[k+g.nx],d=arr[k+g.nx+1];
@@ -214,7 +214,7 @@ const glow=new THREE.Mesh(new THREE.SphereGeometry(1.13,64,48),new THREE.ShaderM
   side:THREE.BackSide,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false}));
 scene.add(glow);
 
-const OCEAN='#0b1624',LAND='#2f3b4c';
+const OCEAN='#0b1624',LAND='#364358';
 const regCv=document.createElement('canvas');regCv.width=(REG.E-REG.W)*REG.ppd;regCv.height=(REG.N-REG.S)*REG.ppd;
 const regTex=new THREE.CanvasTexture(regCv);regTex.anisotropy=renderer.capabilities.getMaxAnisotropy();
 const jetCv=document.createElement('canvas');jetCv.width=1560;jetCv.height=900;
