@@ -75,6 +75,11 @@ body.edit .controls{display:flex}
 .slide.on{opacity:1}
 .slide img,.slide iframe{max-width:100%;max-height:100%;width:auto;height:100%;object-fit:contain;border-radius:3px;border:0}
 .slide iframe{width:100%}
+.slide.pair{gap:.7em;align-items:stretch}
+.slide figure{flex:1 1 0;min-width:0;margin:0;display:flex;flex-direction:column;gap:.2em}
+.slide figure[hidden]{display:none}
+.slide figure img{flex:1 1 0;min-height:0;width:100%;height:auto;object-fit:contain}
+.slide figcaption{text-align:center;color:var(--muted);font-size:.78em}
 .slide ul{list-style:none;margin:0;padding:0;align-self:stretch;width:100%;display:flex;flex-direction:column;justify-content:center;gap:.55em}
 .slide li{border-left:3px solid var(--gold);padding:.1em 0 .1em .65em;font-size:1.08em}
 .dots{display:flex;gap:.35em;align-items:center}
@@ -655,17 +660,18 @@ function videoNode(u){
 }
 function buildSlides(img,news){
   const have=(img&&img.have)||[],defs=[],bust=u=>u+(u.includes('?')?'&':'?')+(u.startsWith('http')?'cache_bust=':'t=')+Date.now();
-  if(have.includes('sat.gif'))defs.push({title:'Satellite',src:'GOES-East GeoColor, NOAA',img:'live/sat.gif'});
-  if(have.includes('wpc.jpg'))defs.push({title:'Fronts and weather',src:'NWS Weather Prediction Center',img:'live/wpc.jpg'});
-  defs.push({title:'Dew point',src:'Oklahoma Mesonet, NWS data',img:OKM+'latest.tdew.png'});
-  defs.push({title:'Altimeter setting',src:'Oklahoma Mesonet, NWS data',img:OKM+'latest.pres.png'});
+  /* images are shown two at a time, side by side, so the wide card is filled without cropping */
+  const p1=[];if(have.includes('sat.gif'))p1.push({cap:'GOES-East GeoColor satellite',img:'live/sat.gif'});if(have.includes('wpc.jpg'))p1.push({cap:'Fronts and weather, Weather Prediction Center',img:'live/wpc.jpg'});
+  if(p1.length)defs.push({title:p1.length>1?'Satellite and fronts':p1[0].cap,src:'NOAA, NWS',figs:p1});
+  defs.push({title:'Dew point and altimeter',src:'Oklahoma Mesonet',figs:[{cap:'Dew point',img:OKM+'latest.tdew.png'},{cap:'Altimeter setting',img:OKM+'latest.pres.png'}]});
   if(news&&news.items&&news.items.length)defs.push({title:'Weather headlines',src:'NWS alerts, RAP, TexMesonet',items:news.items.slice(0,7)});
   if(CFG.video)defs.push({title:'Video',src:'',video:CFG.video});
   const ns=JSON.stringify(defs);
-  if(ns===sig){slides.forEach(s=>{if(s.def.img){s.bad=false;s.node.firstChild.src=bust(s.def.img);}});return;}
+  if(ns===sig){slides.forEach(s=>{if(s.def.figs){s.bad=false;s.node.querySelectorAll('figure').forEach((f,i)=>{f.hidden=false;f.firstChild.src=bust(s.def.figs[i].img);});}});return;}
   sig=ns;const wrap=$('slides'),dots=$('dots');wrap.textContent='';dots.textContent='';
   slides=defs.map(def=>{const n=el('div',null,'slide'),s={def,node:n,bad:false};
-    if(def.img){const im=el('img');im.alt=def.title;im.onerror=()=>{s.bad=true;};im.src=bust(def.img);n.appendChild(im);}
+    if(def.figs){n.classList.add('pair');def.figs.forEach(f=>{const fg=el('figure'),im=el('img');im.alt=f.cap;
+      im.onerror=()=>{fg.hidden=true;s.bad=[...n.querySelectorAll('figure')].every(q=>q.hidden);};im.src=bust(f.img);fg.appendChild(im);fg.appendChild(el('figcaption',f.cap));n.appendChild(fg);});}
     else if(def.items){const ul=el('ul');def.items.forEach(q=>ul.appendChild(el('li',q)));n.appendChild(ul);}
     else if(def.video)n.appendChild(videoNode(def.video));
     wrap.appendChild(n);dots.appendChild(el('i'));return s;});
