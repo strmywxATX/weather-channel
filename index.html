@@ -100,7 +100,7 @@ footer .tag{font-family:var(--display);font-weight:600;text-transform:uppercase;
 <header>
   <div class="brand">
     <h1>Tapp's <span>Weather Channel</span></h1>
-    <span id="campus"></span>
+    <span id="campus" hidden></span>
     <span class="demo" id="demoBadge" hidden>Demo data</span>
   </div>
   <div id="countdown" hidden></div>
@@ -541,7 +541,9 @@ function astro(){
   const now=new Date(),s=SunCalc.getTimes(now,C.lat,C.lon),m=SunCalc.getMoonTimes(now,C.lat,C.lon),il=SunCalc.getMoonIllumination(now),p=il.phase;
   $('sunR').textContent=clock(s.sunrise);$('sunS').textContent=clock(s.sunset);
   const mins=Math.round((s.sunset-s.sunrise)/6e4);$('dayLen').textContent=mins>0?'Daylight '+Math.floor(mins/60)+' h '+(mins%60)+' min':'';
-  $('moonR').textContent=m.rise?clock(m.rise):'none today';$('moonS').textContent=m.set?clock(m.set):'none today';
+  /* about once a month the moon does not rise or set within a calendar day; show the next one, with its day */
+  const nextMoon=k=>{if(m[k])return clock(m[k]);for(let i=1;i<=2;i++){const d=new Date(now.getTime()+i*864e5),q=SunCalc.getMoonTimes(d,C.lat,C.lon);if(q[k])return clock(q[k])+' '+q[k].toLocaleDateString('en-US',{timeZone:TZ,weekday:'short'});}return 'none';};
+  $('moonR').textContent=nextMoon('rise');$('moonS').textContent=nextMoon('set');
   const names=['New','Waxing crescent','First quarter','Waxing gibbous','Full','Waning gibbous','Last quarter','Waning crescent'];
   const idx=p<.03||p>.97?0:p<.22?1:p<.28?2:p<.47?3:p<.53?4:p<.72?5:p<.78?6:7;
   $('moonP').textContent=names[idx]+', '+Math.round(il.fraction*100)+'% lit';
@@ -664,7 +666,7 @@ function buildSlides(img,news){
   const p1=[];if(have.includes('sat.gif'))p1.push({cap:'GOES-East GeoColor satellite',img:'live/sat.gif'});if(have.includes('wpc.jpg'))p1.push({cap:'Fronts and weather, Weather Prediction Center',img:'live/wpc.jpg'});
   if(p1.length)defs.push({title:p1.length>1?'Satellite and fronts':p1[0].cap,src:'NOAA, NWS',figs:p1});
   defs.push({title:'Dew point and altimeter',src:'Oklahoma Mesonet',figs:[{cap:'Dew point',img:OKM+'latest.tdew.png'},{cap:'Altimeter setting',img:OKM+'latest.pres.png'}]});
-  if(news&&news.items&&news.items.length)defs.push({title:'Weather headlines',src:'NWS alerts, RAP, TexMesonet',items:news.items.slice(0,7)});
+  if(news&&news.items&&news.items.length)defs.push({title:'Weather headlines',src:'NWS alerts, RAP, TexMesonet',items:news.items.slice(0,5)});
   if(CFG.video)defs.push({title:'Video',src:'',video:CFG.video});
   const ns=JSON.stringify(defs);
   if(ns===sig){slides.forEach(s=>{if(s.def.figs){s.bad=false;s.node.querySelectorAll('figure').forEach((f,i)=>{f.hidden=false;f.firstChild.src=bust(s.def.figs[i].img);});}});return;}

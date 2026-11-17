@@ -333,7 +333,7 @@ def headlines():
             tx[ev] = tx.get(ev, 0) + 1
     shown = 0
     for ev in PRIORITY:
-        if ev in by and shown < 5:
+        if ev in by and shown < 2:
             st = sorted(by[ev]["states"])
             where = ", ".join(st) if len(st) <= 6 else f"{len(st)} states"
             plural = ev if by[ev]["n"] == 1 else (ev[:-1] + "ies" if ev.endswith("y") else ev + ("es" if ev.endswith("ch") else "s"))
