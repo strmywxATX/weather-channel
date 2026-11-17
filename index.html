@@ -567,7 +567,7 @@ function drawMeteo(){
   const cv=$('meteo'),W=cv.clientWidth,H=cv.clientHeight;if(!W||!H||!ROWS.length)return;
   const dpr=Math.min(window.devicePixelRatio||1,2);cv.width=W*dpr;cv.height=H*dpr;const c=cv.getContext('2d');c.scale(dpr,dpr);
   const css=getComputedStyle(document.documentElement),col=k=>css.getPropertyValue(k).trim(),fs=Math.max(10,parseFloat(getComputedStyle(document.body).fontSize)*.74);
-  const TEXT=col('--text'),MUTED=col('--muted'),GRID='rgba(160,185,220,.14)',padL=fs*2.5,padR=fs*5,padB=fs*1.5,gap=fs*.7,head=fs*1.25;
+  const TEXT=col('--text'),MUTED=col('--muted'),GRID='rgba(160,185,220,.14)',padL=fs*2.5,padR=fs*5.8,padB=fs*1.5,gap=fs*.7,head=fs*1.25;
   const panels=[{title:'Temperature and dew point, °F',s:[{k:'T',c:col('--temp'),n:'Temp'},{k:'Td',c:col('--dew'),n:'Dew'}]},
                 {title:'Wind and gusts, mph',zero:true,s:[{k:'ws',c:col('--wind'),n:'Wind'},{k:'gust',c:col('--wind'),n:'Gust',dots:true}]},
                 {title:'Pressure, mb',s:[{k:'p',c:'#aab7ca',n:''}]}];
