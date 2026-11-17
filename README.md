@@ -1,4 +1,4 @@
-# GEO 1305 Weather Channel
+# Tapp's Weather Channel
 
 A pre-lecture weather display for GEO 1305 Meteorology at Texas State University.
 
