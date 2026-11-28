@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tapp's Weather Channel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Layout idea: broadcast screen for a projector. Header strip, globe on the left ~62%, a column of three cards on the right, forecast ticker along the bottom. Everything is sized in em off a viewport-scaled base so it fills any projector. Single dark theme by choice. */
+  --space:#03060d;
+  --panel:#0b1422;
+  --line:rgba(160,185,220,.2);
+  --text:#eef2f7;
+  --muted:#93a4bb;
+  --gold:#c9ad6a;
+  --temp:#e2683f;
+  --dew:#1f9f86;
+  --wind:#4f8fe8;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif;
+  --body:"Barlow","Helvetica Neue",Arial,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{display:grid;grid-template-rows:auto minmax(0,1fr) auto;background:var(--space);color:var(--text);font-family:var(--body);overflow:hidden;font-size:clamp(11px,1.02vw,26px);line-height:1.25}
+header{display:flex;align-items:center;justify-content:space-between;gap:.4em 2em;padding:.45em 1.1em;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:.8em;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:600;font-size:2em;letter-spacing:.02em;margin:0;text-transform:uppercase;line-height:1}
+h1 span{color:var(--gold)}
+#campus{color:var(--muted);font-size:1.05em}
+.demo[hidden],#countdown[hidden]{display:none}
+.demo{font-size:.85em;font-weight:500;color:#1a1305;background:var(--gold);padding:.15em .6em;border-radius:3px}
+#countdown{font-family:var(--display);font-size:1.7em;font-weight:600;color:var(--gold);font-variant-numeric:tabular-nums;white-space:nowrap}
+.clocks{display:flex;gap:1.4em;font-family:var(--display);font-variant-numeric:tabular-nums}
+.clock b{display:block;font-weight:600;font-size:2em;line-height:1}
+.clock small{font-family:var(--body);font-size:.8em;color:var(--muted)}
+main{display:grid;grid-template-columns:minmax(0,1.62fr) minmax(0,1fr);min-height:0}
+#globeWrap{position:relative;min-width:0;min-height:0;overflow:hidden}
+#scene{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab}
+#scene:active{cursor:grabbing}
+.legends{position:absolute;left:.7em;right:.7em;bottom:.6em;display:flex;gap:.6em;align-items:flex-end;pointer-events:none}
+.legend{background:rgba(9,17,31,.84);border:1px solid var(--line);border-radius:5px;padding:.4em .65em;flex:1 1 0;min-width:0}
+.legend h2{font-family:var(--display);font-weight:500;font-size:.95em;letter-spacing:.04em;text-transform:uppercase;margin:0 0 .25em}
+.legend h2 em{display:block;font-family:var(--body);font-style:normal;font-size:.72em;color:var(--muted);text-transform:none;letter-spacing:0}
+.bar{height:.55em;border-radius:2px}
+.ticks{display:flex;justify-content:space-between;font-size:.72em;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:.15em}
+.controls{position:absolute;right:.7em;top:.7em;background:rgba(9,17,31,.9);border:1px solid var(--line);border-radius:6px;padding:10px 14px;display:none;flex-direction:column;gap:7px;font-size:14px;width:230px}
+body.edit .controls{display:flex}
+.controls label{display:flex;align-items:center;gap:8px;cursor:pointer}
+.controls input[type=checkbox]{accent-color:var(--gold);width:16px;height:16px}
+.controls input[type=range]{width:100%;accent-color:var(--gold)}
+.controls input:focus-visible,.controls button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.controls .hint{color:var(--muted);font-size:12px;margin:0}
+.controls button{font:inherit;font-size:13px;color:var(--text);background:transparent;border:1px solid var(--gold);border-radius:4px;padding:5px 8px;cursor:pointer}
+#err{position:absolute;inset:auto 1em 50% 1em;text-align:center;color:#ffb4a8}
+.side{display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:.55em;padding:.55em;min-height:0;min-width:0;border-left:1px solid var(--line)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:.5em .75em;min-height:0;min-width:0}
+.card>h2{font-family:var(--display);font-weight:500;font-size:1.1em;letter-spacing:.04em;text-transform:uppercase;margin:0 0 .35em;display:flex;justify-content:space-between;align-items:baseline;gap:.6em}
+.card>h2 em{font-family:var(--body);font-style:normal;font-size:.68em;color:var(--muted);text-transform:none;letter-spacing:0;text-align:right}
+.sky{position:relative;height:clamp(70px,9.5vh,180px);border-radius:4px;overflow:hidden}
+#sky{position:absolute;inset:0;width:100%;height:100%;display:block}
+.sky small,.moonrow small{display:block;color:#c5d0e0;font-size:.72em}
+.sky b,.moonrow b{font-family:var(--display);font-weight:600;font-size:1.35em;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1}
+.skyL,.skyR,.skyC{position:absolute;bottom:.35em;text-shadow:0 1px 3px #000}
+.skyL{left:.6em}.skyR{right:.6em;text-align:right}.skyC{left:0;right:0;top:.3em;bottom:auto;text-align:center}
+.moonrow{display:flex;align-items:center;gap:1.4em;margin-top:.3em}
+.moonrow canvas{width:1.9em;height:1.9em;flex:none}
+.moonrow b{font-size:1.2em}
+#meteo{display:block;width:100%;height:clamp(210px,34vh,560px)}
+.rot{position:relative;display:flex;flex-direction:column}
+.slides{position:relative;flex:1;min-height:0}
+.slide{position:absolute;inset:0;opacity:0;transition:opacity .8s;display:flex;align-items:center;justify-content:center}
+.slide.on{opacity:1}
+.slide img,.slide iframe{max-width:100%;max-height:100%;width:auto;height:100%;object-fit:contain;border-radius:3px;border:0}
+.slide iframe{width:100%}
+.slide.pair{gap:.7em;align-items:stretch}
+.slide figure{flex:1 1 0;min-width:0;margin:0;display:flex;flex-direction:column;gap:.2em}
+.slide figure[hidden]{display:none}
+.slide figure img{flex:1 1 0;min-height:0;width:100%;height:auto;object-fit:contain}
+.slide figcaption{text-align:center;color:var(--muted);font-size:.78em}
+.slide ul{list-style:none;margin:0;padding:0;align-self:stretch;width:100%;display:flex;flex-direction:column;justify-content:center;gap:.55em}
+.slide li{border-left:3px solid var(--gold);padding:.1em 0 .1em .65em;font-size:1.08em}
+.dots{display:flex;gap:.35em;align-items:center}
+.dots i{width:.5em;height:.5em;border-radius:50%;background:var(--line)}
+.dots i.on{background:var(--gold)}
+footer{display:flex;align-items:stretch;border-top:1px solid var(--line);background:var(--panel);min-width:0}
+footer .tag{font-family:var(--display);font-weight:600;text-transform:uppercase;letter-spacing:.04em;background:var(--gold);color:#1a1305;padding:.4em .9em;white-space:nowrap;font-size:1.1em;display:flex;align-items:center}
+.tick{overflow:hidden;flex:1;min-width:0;display:flex;align-items:center}
+.tick div{white-space:nowrap;font-size:1.2em;padding-left:100%;animation:scroll 80s linear infinite;will-change:transform}
+.tick b{font-family:var(--display);font-weight:600;color:var(--gold);margin-right:.35em;font-size:1.1em}
+.tick span{margin-right:2.2em}
+@keyframes scroll{from{transform:translateX(0)}to{transform:translateX(-100%)}}
+@media (prefers-reduced-motion:reduce){.tick div{animation:none;padding-left:.8em}.slide{transition:none}}
+@media (max-width:760px){body{display:block;overflow:auto}main{display:block}#globeWrap{height:70vw}.legends{flex-wrap:wrap}.astro{grid-template-columns:repeat(2,auto)}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>Tapp's <span>Weather Channel</span></h1>
+    <span id="campus" hidden></span>
+    <span class="demo" id="demoBadge" hidden>Demo data</span>
+  </div>
+  <div id="countdown" hidden></div>
+  <div class="clocks">
+    <div class="clock"><b id="tLocal">--:--</b><small>Central time</small></div>
+    <div class="clock"><b id="tUtc">--:--</b><small>UTC</small></div>
+  </div>
+</header>
+<main>
+  <div id="globeWrap">
+    <canvas id="scene" aria-label="3D globe of North America with radar, wind barbs and temperatures at ASOS stations, and the 250 millibar jet stream on a layer raised above the surface"></canvas>
+    <div class="legends">
+      <div class="legend"><h2>250 mb jet stream <em id="jetSrc">loading</em></h2><div class="bar" id="jetBar"></div><div class="ticks" style="display:grid;grid-template-columns:repeat(6,1fr)"><span>50</span><span>60</span><span>80</span><span>100</span><span>125</span><span>150</span></div></div>
+      <div class="legend"><h2>Radar <em id="radSrc">loading</em></h2><div class="bar" id="radBar"></div><div class="ticks"><span>15</span><span>25</span><span>35</span><span>45</span><span>55</span><span>65</span></div></div>
+      <div class="legend"><h2>Surface observations <em id="tmpSrc">loading</em></h2></div>
+    </div>
+    <div class="controls">
+      <label for="cTemp"><input type="checkbox" id="cTemp" checked>Temperature readings</label>
+      <label for="cBarb"><input type="checkbox" id="cBarb" checked>Wind barbs at ASOS sites</label>
+      <label for="cRad"><input type="checkbox" id="cRad" checked>Radar</label>
+      <label for="cJet"><input type="checkbox" id="cJet" checked>Jet stream layer</label>
+      <label for="jetH" style="flex-direction:column;align-items:stretch;gap:3px;cursor:default"><span>Jet layer height: <span id="jetHv">25</span>&times; true scale</span><input type="range" id="jetH" min="10" max="80" step="5" value="25"></label>
+      <p class="hint">Drag to turn the globe. Scroll to zoom. Your view is remembered in this browser.</p>
+      <p class="hint" id="viewOut" style="font-variant-numeric:tabular-nums;color:var(--text)"></p>
+      <button type="button" id="copyView">Copy view settings</button>
+    </div>
+    <div id="err"></div>
+  </div>
+  <div class="side">
+    <section class="card">
+      <h2>Sun and moon today <em id="astroSrc"></em></h2>
+      <div class="sky">
+        <canvas id="sky" role="img" aria-label="The sun's path across the sky today, from sunrise to sunset, above the curve of the Earth"></canvas>
+        <div class="skyL"><small>Sunrise today</small><b id="sunR">--</b></div>
+        <div class="skyC"><small id="dayLen"></small></div>
+        <div class="skyR"><small>Sunset today</small><b id="sunS">--</b></div>
+      </div>
+      <div class="moonrow"><canvas id="moonIcon" width="64" height="64" aria-hidden="true"></canvas><span><small>Moonrise</small><b id="moonR">--</b></span><span><small>Moonset</small><b id="moonS">--</b></span><span><small>Phase</small><b id="moonP">--</b></span></div>
+    </section>
+    <section class="card">
+      <h2>TXST Round Rock, past 24 hours <em id="stnSrc" style="white-space:nowrap">loading</em></h2>
+      <canvas id="meteo" role="img" aria-label="Meteogram of the past 24 hours at the Round Rock station: air temperature and dew point, wind speed, gusts and direction, pressure, and solar radiation, with the current reading beside each panel"></canvas>
+    </section>
+    <section class="card rot">
+      <h2><span id="rotTitle">Loading</span><span style="display:flex;gap:.8em;align-items:baseline"><em id="rotSrc"></em><span class="dots" id="dots"></span></span></h2>
+      <div class="slides" id="slides"></div>
+    </section>
+  </div>
+</main>
+<footer>
+  <div class="tag" id="tickTag">Forecast</div>
+  <div class="tick"><div id="tick">Loading the forecast</div></div>
+</footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.9.0/suncalc.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+'use strict';
+const D2R=Math.PI/180;
+const REG={W:-170,E:-40,S:5,N:80,ppd:24};
+const TRUE_H=10.4/6371; // 250 mb is about 10.4 km up; Earth radius 6371 km
+let jetExag=25;
+
+/* ---------- colour ramps ---------- */
+const TEMP=[[-10,[217,211,230]],[0,[167,155,196]],[10,[125,121,176]],[20,[95,119,168]],[30,[95,147,179]],[40,[111,175,181]],[50,[127,181,156]],[60,[169,190,134]],[70,[214,201,127]],[80,[214,166,109]],[90,[196,122,90]],[100,[165,82,77]],[110,[124,58,69]]];
+const RAD=[[15,[3,0,244]],[20,[2,253,2]],[25,[1,197,1]],[30,[0,142,0]],[35,[253,248,2]],[40,[229,188,0]],[45,[253,149,0]],[50,[253,0,0]],[55,[212,0,0]],[60,[188,0,0]],[65,[248,0,253]]];
+/* isotach bands follow the UCAR/RAL upper-air maps: 30, 40, 50, 60, 80, 100, 125, 150 kt */
+const JET=[[50,[255,154,46,.25]],[60,[255,200,50,.28]],[80,[255,160,160,.33]],[100,[255,100,100,.37]],[125,[240,20,20,.41]],[150,[255,0,200,.44]]];
+function ramp(stops,v){
+  if(v<=stops[0][0])return stops[0][1];
+  for(let i=1;i<stops.length;i++){if(v<=stops[i][0]){const a=stops[i-1],b=stops[i],t=(v-a[0])/(b[0]-a[0]);return a[1].map((c,k)=>c+(b[1][k]-c)*t);}}
+  return stops[stops.length-1][1];
+}
+function step(stops,v){let c=null;for(const s of stops){if(v>=s[0])c=s[1];}return c;}
+const css=c=>'rgb('+c.slice(0,3).map(Math.round).join(',')+')';
+document.getElementById('jetBar').style.background='linear-gradient(90deg,'+JET.map((s,i)=>css(s[1])+' '+(i*100/6)+'%,'+css(s[1])+' '+((i+1)*100/6)+'%').join(',')+')';
+document.getElementById('radBar').style.background='linear-gradient(90deg,'+RAD.map((s,i)=>css(s[1])+' '+(i*10)+'%,'+css(s[1])+' '+((i+1)*10)+'%').join(',')+')';
+
+/* ---------- demo weather (stand-ins for RTMA, MRMS and RAP until the live feed exists) ---------- */
+function hash(i,j){let h=(i*374761393+j*668265263)|0;h=(h^(h>>>13))*1274126177|0;return((h^(h>>>16))>>>0)/4294967295;}
+function noise(x,y){const i=Math.floor(x),j=Math.floor(y),fx=x-i,fy=y-j,sx=fx*fx*(3-2*fx),sy=fy*fy*(3-2*fy);
+  return (hash(i,j)*(1-sx)+hash(i+1,j)*sx)*(1-sy)+(hash(i,j+1)*(1-sx)+hash(i+1,j+1)*sx)*sy;}
+function fbm(x,y){return .55*noise(x,y)+.3*noise(x*2.1,y*2.1)+.15*noise(x*4.3,y*4.3);}
+const LOW={lat:39,lon:-96};
+function frontLon(lat){return lat<=LOW.lat?LOW.lon-.75*(LOW.lat-lat):LOW.lon+1.2*(lat-LOW.lat);}
+function coldSide(lat,lon){return 1/(1+Math.exp(-(frontLon(lat)-lon)/1.3));}
+function tempDemo(lat,lon){return 84-1.45*(lat-24)-22*coldSide(lat,lon)+6*(fbm(lon*.35,lat*.35)-.5);}
+function sfcWind(lat,lon){
+  const dx=(lon-LOW.lon)*Math.cos(lat*D2R),dy=lat-LOW.lat,r=Math.hypot(dx,dy)+1e-6,q=r/5,vt=30*q/(1+q*q);
+  const S=coldSide(lat,lon);
+  let u=-dy/r*vt-dx/r*vt*.35+S*9+(1-S)*2, v=dx/r*vt-dy/r*vt*.35-S*9+(1-S)*9;
+  return [u,v];
+}
+function radarDbz(lat,lon){
+  const c=Math.cos(lat*D2R),d=(lon-frontLon(lat)-.8)*c;
+  let z=0;
+  if(lat<LOW.lat+.5){
+    const taper=Math.max(0,Math.min(1,(lat-28.5)/2.5))*Math.max(0,Math.min(1,(LOW.lat+.5-lat)/1.5));
+    z=Math.max(z,62*Math.exp(-(d/.42)*(d/.42))*(.45+.55*noise(lat*2.6,7))*taper);
+    z=Math.max(z,34*Math.exp(-((d+1.3)/1.1)*((d+1.3)/1.1))*fbm(lon*1.5,lat*1.5)*1.5*taper);
+  }
+  const ex=(lon+98)*c/4.2,ey=(lat-42)/2.3;
+  z=Math.max(z,44*Math.exp(-(ex*ex+ey*ey))*(.35+fbm(lon*1.2,lat*1.2)));
+  return z;
+}
+function jetAxis(lon){return 40-8*Math.cos((lon+105)*Math.PI/40);}
+function jetWindDemo(lat,lon){
+  const a=jetAxis(lon),w=(lat-a)/5.5;
+  const spd=25+135*Math.exp(-w*w)*(.72+.28*Math.cos((lon+92)*Math.PI/45));
+  const slope=8*(Math.PI/40)*Math.sin((lon+105)*Math.PI/40),te=Math.cos(lat*D2R),n=Math.hypot(te,slope);
+  return [spd*te/n,spd*slope/n,spd];
+}
+
+/* ---------- live data (written by the scheduled job into live/); each layer falls back to the demo if its file is missing ---------- */
+const LIVE={rap:null,asos:null,radar:null};
+const RELIEF={exaggeration:5,gain:1.9,strength:1};
+function gridAt(g,arr,lat,lon){
+  const x=(lon-g.W)/g.d,y=(g.N-lat)/g.d;if(!(x>=0&&y>=0&&x<=g.nx-1&&y<=g.ny-1))return NaN;
+  const i=Math.min(g.nx-2,Math.floor(x)),j=Math.min(g.ny-2,Math.floor(y)),fx=x-i,fy=y-j,k=j*g.nx+i,a=arr[k],b=arr[k+1],c=arr[k+g.nx],d=arr[k+g.nx+1];
+  if(a==null||b==null||c==null||d==null)return NaN;
+  return (a*(1-fx)+b*fx)*(1-fy)+(c*(1-fx)+d*fx)*fy;
+}
+function jetWind(lat,lon){
+  if(!LIVE.rap)return jetWindDemo(lat,lon);
+  const u=gridAt(LIVE.rap,LIVE.rap.u,lat,lon),v=gridAt(LIVE.rap,LIVE.rap.v,lat,lon);
+  if(u!==u||v!==v)return [0,0,0];return [u,v,Math.hypot(u,v)];
+}
+function tempF(lat,lon){return LIVE.rap&&LIVE.rap.t?gridAt(LIVE.rap,LIVE.rap.t,lat,lon):tempDemo(lat,lon);}
+function coreLat(lon){
+  if(!LIVE.rap)return jetAxis(lon);
+  let best=null,m=50;for(let lat=15;lat<=75;lat+=.5){const sp=jetWind(lat,lon)[2];if(sp>m){m=sp;best=lat;}}return best;
+}
+
+/* ---------- geometry helpers ---------- */
+function P(lat,lon,r){const a=lat*D2R,b=lon*D2R;return new THREE.Vector3(r*Math.cos(a)*Math.cos(b),r*Math.sin(a),-r*Math.cos(a)*Math.sin(b));}
+function patch(W,E,S,N,r,nx,ny){
+  const pos=[],uv=[],idx=[];
+  for(let j=0;j<=ny;j++)for(let i=0;i<=nx;i++){const u=i/nx,v=j/ny,p=P(S+(N-S)*v,W+(E-W)*u,r);pos.push(p.x,p.y,p.z);uv.push(u,v);}
+  for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){const a=j*(nx+1)+i,b=a+1,c=a+nx+1,d=c+1;idx.push(a,b,d,a,d,c);}
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+  g.setIndex(idx);return g;
+}
+function pathOf(rings,X,Y,close){const p=new Path2D();for(const r of rings){p.moveTo(X(r[0]),Y(r[1]));for(let i=2;i<r.length;i+=2)p.lineTo(X(r[i]),Y(r[i+1]));if(close)p.closePath();}return p;}
+
+/* ---------- wind barbs ---------- */
+function drawBarb(ctx,x,y,lat,u,v){
+  const s=Math.hypot(u,v);let k=Math.round(s/5)*5;
+  ctx.save();ctx.translate(x,y);ctx.scale(1/Math.cos(lat*D2R),1);
+  const line=new Path2D(),flag=new Path2D();
+  if(k<5){line.arc(0,0,5,0,Math.PI*2);}
+  else{
+    const ux=-u/s,uy=v/s,lx=-v/s,ly=-u/s,L=34,fx=lx*.92+ux*.38,fy=ly*.92+uy*.38;
+    line.moveTo(0,0);line.lineTo(ux*L,uy*L);
+    let pos=L;const only5=k===5;if(only5)pos-=6;
+    while(k>=50){flag.moveTo(ux*pos,uy*pos);flag.lineTo(ux*(pos-4)+lx*14,uy*(pos-4)+ly*14);flag.lineTo(ux*(pos-8),uy*(pos-8));flag.closePath();pos-=10;k-=50;}
+    while(k>=10){line.moveTo(ux*pos,uy*pos);line.lineTo(ux*pos+fx*14,uy*pos+fy*14);pos-=5.5;k-=10;}
+    if(k>=5){line.moveTo(ux*pos,uy*pos);line.lineTo(ux*pos+fx*7.5,uy*pos+fy*7.5);}
+  }
+  ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.strokeStyle='rgba(5,10,20,.85)';ctx.lineWidth=5.5;ctx.stroke(line);ctx.stroke(flag);
+  ctx.strokeStyle='#fff';ctx.fillStyle='#fff';ctx.lineWidth=2.4;ctx.stroke(line);ctx.fill(flag);ctx.stroke(flag);
+  ctx.restore();
+}
+
+/* ---------- scene ---------- */
+const canvas=document.getElementById('scene');
+let renderer;
+try{renderer=new THREE.WebGLRenderer({canvas,antialias:true});}catch(e){document.getElementById('err').textContent='This browser could not start 3D graphics. Try a current version of Chrome or Safari.';return;}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(36,1,.05,50);
+const view={lat:19.8,lon:-100.1,dist:1.89,tLat:33,tLon:-100.1};
+try{const sv=JSON.parse(localStorage.getItem('wxGlobeView')||'null');if(sv&&isFinite(sv.lat)&&isFinite(sv.lon)&&isFinite(sv.dist)){view.lat=sv.lat;view.lon=sv.lon;view.tLon=sv.lon;view.dist=sv.dist;if(sv.jet>=10&&sv.jet<=80){jetExag=sv.jet;document.getElementById('jetH').value=sv.jet;document.getElementById('jetHv').textContent=sv.jet;}}}catch(e){}
+function viewText(){return 'view lat '+view.lat.toFixed(1)+', lon '+view.lon.toFixed(1)+', zoom '+view.dist.toFixed(2)+', jet '+jetExag+'x';}
+function saveView(){document.getElementById('viewOut').textContent=viewText();try{localStorage.setItem('wxGlobeView',JSON.stringify({lat:view.lat,lon:view.lon,dist:view.dist,jet:jetExag}));}catch(e){}}
+
+const st=[];for(let i=0;i<1800;i++){const v=new THREE.Vector3(Math.random()-.5,Math.random()-.5,Math.random()-.5).normalize().multiplyScalar(30);st.push(v.x,v.y,v.z);}
+const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.Float32BufferAttribute(st,3));
+scene.add(new THREE.Points(sg,new THREE.PointsMaterial({color:0xcfd8ff,size:1.3,sizeAttenuation:false,transparent:true,opacity:.7})));
+
+const glow=new THREE.Mesh(new THREE.SphereGeometry(1.13,64,48),new THREE.ShaderMaterial({
+  vertexShader:'varying vec3 n;void main(){n=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+  fragmentShader:'varying vec3 n;void main(){float i=pow(max(0.0,0.68-dot(n,vec3(0.0,0.0,1.0))),3.0);gl_FragColor=vec4(0.32,0.6,1.0,1.0)*i;}',
+  side:THREE.BackSide,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false}));
+scene.add(glow);
+
+const OCEAN='#0b1624',LAND='#364358';
+const regCv=document.createElement('canvas');regCv.width=(REG.E-REG.W)*REG.ppd;regCv.height=(REG.N-REG.S)*REG.ppd;
+const regTex=new THREE.CanvasTexture(regCv);regTex.anisotropy=renderer.capabilities.getMaxAnisotropy();
+const jetCv=document.createElement('canvas');jetCv.width=1560;jetCv.height=900;
+const jetTex=new THREE.CanvasTexture(jetCv);
+const jetMesh=new THREE.Mesh(patch(REG.W,REG.E,REG.S,REG.N,1,96,64),new THREE.MeshBasicMaterial({map:jetTex,transparent:true,depthWrite:false,side:THREE.DoubleSide}));
+jetMesh.renderOrder=2;
+const jetGroup=new THREE.Group();jetGroup.add(jetMesh);scene.add(jetGroup);jetGroup.visible=false;
+
+/* jet shell texture: isotach bands every 25 kt with contour lines, so jet streak cores and their entrance and exit regions stand out; a faint graticule makes it read as a sheet above the ground */
+function buildJetTexture(){
+  const w=jetCv.width,h=jetCv.height,g=jetCv.getContext('2d'),im=g.createImageData(w,h),band=new Int8Array(w*h),lev=new Int16Array(w*h);
+  const hasZ=!!(LIVE.rap&&LIVE.rap.z),CI=120; /* height contours every 12 dm, as on the UCAR maps */
+  for(let j=0;j<h;j++)for(let i=0;i<w;i++){
+    const lat=REG.N-(j+.5)/h*(REG.N-REG.S),lon=REG.W+(i+.5)/w*(REG.E-REG.W),sp=jetWind(lat,lon)[2];
+    let bd=-1;for(let q=0;q<JET.length;q++)if(sp>=JET[q][0])bd=q;band[j*w+i]=bd;
+    if(hasZ){const z=gridAt(LIVE.rap,LIVE.rap.z,lat,lon);lev[j*w+i]=z===z?Math.floor(z/CI):-1;}
+  }
+  const cross=(k,d,s)=>lev[k-d*s]>=0&&lev[k+d*s]>=0&&lev[k-d*s]!==lev[k+d*s];
+  for(let j=4;j<h-4;j++)for(let i=4;i<w-4;i++){
+    const k=j*w+i,bd=band[k],o=k*4,lon=REG.W+(i+.5)/w*(REG.E-REG.W),edge=Math.max(0,Math.min(1,(lon-REG.W)/12,(REG.E-lon)/12));
+    if(hasZ&&(cross(k,1,1)||cross(k,1,w))){im.data[o]=12;im.data[o+1]=18;im.data[o+2]=32;im.data[o+3]=245*edge;continue;}
+    if(hasZ&&(cross(k,3,1)||cross(k,3,w))){im.data[o]=255;im.data[o+1]=255;im.data[o+2]=255;im.data[o+3]=150*edge;continue;}
+    if(bd<0)continue;
+    const col=JET[bd][1];im.data[o]=col[0];im.data[o+1]=col[1];im.data[o+2]=col[2];im.data[o+3]=255*col[3]*edge;
+  }
+  g.putImageData(im,0,0);jetTex.needsUpdate=true;
+}
+buildJetTexture();
+
+/* tethers from the ground up to the jet core, so the height is readable */
+const tetherGeo=new THREE.BufferGeometry();
+const tethers=new THREE.LineSegments(tetherGeo,new THREE.LineBasicMaterial({color:0xbcd6ff,transparent:true,opacity:.45}));
+jetGroup.add(tethers);
+function buildTethers(){const p=[];for(let lon=-135;lon<=-65;lon+=10){const lat=coreLat(lon);if(lat==null)continue;const a=P(lat,lon,1.002),b=P(lat,lon,1+TRUE_H*jetExag);p.push(a.x,a.y,a.z,b.x,b.y,b.z);}
+  tetherGeo.setAttribute('position',new THREE.Float32BufferAttribute(p,3));}
+
+/* jet particles */
+const NP=850,TR=14,pl=new Float32Array(NP),pn=new Float32Array(NP),age=new Float32Array(NP),life=new Float32Array(NP);
+const trail=new Float32Array(NP*TR*2);
+const segPos=new Float32Array(NP*(TR-1)*6),segCol=new Float32Array(NP*(TR-1)*6);
+function spawn(i){
+  let lat=0,lon=0;
+  for(let t=0;t<25;t++){lon=-165+Math.random()*120;lat=LIVE.rap?12+Math.random()*63:jetAxis(lon)+(Math.random()-.5)*26;if(jetWind(lat,lon)[2]>45+Math.random()*60)break;}
+  pl[i]=lat;pn[i]=lon;age[i]=0;life[i]=90+Math.random()*120;
+  for(let k=0;k<TR;k++){trail[(i*TR+k)*2]=lat;trail[(i*TR+k)*2+1]=lon;}
+}
+for(let i=0;i<NP;i++){spawn(i);age[i]=Math.random()*life[i];}
+const pg=new THREE.BufferGeometry();
+pg.setAttribute('position',new THREE.BufferAttribute(segPos,3));pg.setAttribute('color',new THREE.BufferAttribute(segCol,3));
+const flow=new THREE.LineSegments(pg,new THREE.LineBasicMaterial({vertexColors:true,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false}));
+flow.renderOrder=3;flow.frustumCulled=false;jetGroup.add(flow);
+function stepFlow(move){
+  const r=1+TRUE_H*jetExag+.0015;
+  for(let i=0;i<NP;i++){
+    if(move){
+      const w=jetWind(pl[i],pn[i]);
+      pn[i]+=w[0]*.0026/Math.cos(pl[i]*D2R);pl[i]+=w[1]*.0026;age[i]++;
+      if(age[i]>life[i]||pn[i]>REG.E-2||pn[i]<REG.W+2||w[2]<32){spawn(i);}
+      else{trail.copyWithin(i*TR*2+2,i*TR*2,i*TR*2+(TR-1)*2);trail[i*TR*2]=pl[i];trail[i*TR*2+1]=pn[i];}
+    }
+    const fade=Math.min(1,age[i]/12,(life[i]-age[i])/12),sp=jetWind(pl[i],pn[i])[2],b=Math.max(0,fade)*Math.min(.8,.25+sp/200);
+    for(let k=0;k<TR-1;k++){
+      const a=P(trail[(i*TR+k)*2],trail[(i*TR+k)*2+1],r),c=P(trail[(i*TR+k+1)*2],trail[(i*TR+k+1)*2+1],r),o=(i*(TR-1)+k)*6;
+      segPos[o]=a.x;segPos[o+1]=a.y;segPos[o+2]=a.z;segPos[o+3]=c.x;segPos[o+4]=c.y;segPos[o+5]=c.z;
+      const f1=b*(1-k/(TR-1)),f2=b*(1-(k+1)/(TR-1));
+      segCol[o]=f1;segCol[o+1]=f1;segCol[o+2]=f1;segCol[o+3]=f2;segCol[o+4]=f2;segCol[o+5]=f2;
+    }
+  }
+  pg.attributes.position.needsUpdate=true;pg.attributes.color.needsUpdate=true;
+}
+function setJetHeight(){jetMesh.scale.setScalar(1+TRUE_H*jetExag);buildTethers();stepFlow(false);}
+setJetHeight();
+
+/* ---------- surface map, drawn once the boundaries arrive ---------- */
+let redraw=function(){};
+const getJ=u=>fetch(u).then(r=>{if(!r.ok)throw new Error(r.status);return r.json();});
+const getImg=u=>new Promise(res=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>res(null);i.src=u;});
+Promise.all([getJ('data/boundaries.json'),getJ('data/stations.json'),getImg('relief/elev.png')]).then(([B,ST,hi])=>hi?[B,ST,null,hi]:getImg('data/elevation.png').then(lo=>[B,ST,lo,null])).then(([B,ST,elev,hi])=>{
+  /* soft relief from the high-resolution elevation image: light from the northwest plus two fill lights, kept low in contrast */
+  let shadeHi=null;
+  if(hi){
+    const w=hi.width,h=hi.height;shadeHi=document.createElement('canvas');shadeHi.width=w;shadeHi.height=h;const c=shadeHi.getContext('2d');
+    c.drawImage(hi,0,0);const im=c.getImageData(0,0,w,h),d=im.data,ev=new Float32Array(w*h);
+    for(let k=0;k<w*h;k++)ev[k]=d[k*4]*256+d[k*4+1]-1000;
+    const ppd=w/(REG.E-REG.W),dy=111320/ppd,ZF=RELIEF.exaggeration,L=[[315,.6],[250,.2],[20,.2]].map(a=>[Math.sin(a[0]*D2R)*.7071,Math.cos(a[0]*D2R)*.7071,.7071,a[1]]);
+    for(let j=0;j<h;j++){const lat=REG.N-(j+.5)/ppd,dx=dy*Math.cos(lat*D2R),jm=Math.max(0,j-1)*w,jp=Math.min(h-1,j+1)*w;
+      for(let i=0;i<w;i++){const k=j*w+i,gx=(ev[j*w+Math.min(w-1,i+1)]-ev[j*w+Math.max(0,i-1)])/(2*dx)*ZF,gn=(ev[jm+i]-ev[jp+i])/(2*dy)*ZF,nl=1/Math.sqrt(gx*gx+gn*gn+1);
+        let sh=0;for(const l of L)sh+=l[3]*Math.max(0,(-gx*l[0]-gn*l[1]+l[2])*nl);
+        const rel=(sh/.7071-1)*RELIEF.gain,v=128+127*Math.max(-1,Math.min(1,rel)),o=k*4;d[o]=d[o+1]=d[o+2]=v;d[o+3]=255;}}
+    c.putImageData(im,0,0);
+  }
+  /* hillshade from the elevation map, lit from the northwest */
+  let shade=shadeHi;
+  if(elev){
+    const sx=(REG.W+180)/360*elev.width,sy=(90-REG.N)/180*elev.height,sw=Math.round((REG.E-REG.W)/360*elev.width),sh=Math.round((REG.N-REG.S)/180*elev.height);
+    shade=document.createElement('canvas');shade.width=sw;shade.height=sh;const c=shade.getContext('2d');
+    c.drawImage(elev,sx,sy,sw,sh,0,0,sw,sh);const src=c.getImageData(0,0,sw,sh),dst=c.createImageData(sw,sh),e=(i,j)=>src.data[(Math.max(0,Math.min(sh-1,j))*sw+Math.max(0,Math.min(sw-1,i)))*4];
+    for(let j=0;j<sh;j++)for(let i=0;i<sw;i++){const v=Math.max(20,Math.min(240,128+3.6*((e(i+1,j)-e(i-1,j))+(e(i,j+1)-e(i,j-1)))+.12*e(i,j))),k=(j*sw+i)*4;dst.data[k]=dst.data[k+1]=dst.data[k+2]=v;dst.data[k+3]=255;}
+    c.putImageData(dst,0,0);
+  }
+  const wc=document.createElement('canvas');wc.width=2048;wc.height=1024;const w=wc.getContext('2d');
+  w.fillStyle=OCEAN;w.fillRect(0,0,2048,1024);w.fillStyle=LAND;
+  w.fill(pathOf(B.landWorld,x=>(x+180)/360*2048,y=>(90-y)/180*1024,true),'evenodd');
+  scene.add(new THREE.Mesh(patch(-180,180,-90,90,1,128,64),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(wc)})));
+  const reg=new THREE.Mesh(patch(REG.W,REG.E,REG.S,REG.N,1.0008,96,64),new THREE.MeshBasicMaterial({map:regTex}));
+  scene.add(reg);
+
+  const X=lon=>(lon-REG.W)*REG.ppd,Y=lat=>(REG.N-lat)*REG.ppd;
+  const land=pathOf(B.landNA,X,Y,true),lakes=pathOf(B.lakes,X,Y,true),states=pathOf(B.stateLines,X,Y,false),countries=pathOf(B.countryLines,X,Y,false);
+
+  const tw=(REG.E-REG.W)*4,th=(REG.N-REG.S)*4,tc=document.createElement('canvas');tc.width=tw;tc.height=th;
+  function buildTemp(){const c=tc.getContext('2d'),im=c.createImageData(tw,th);
+    for(let j=0;j<th;j++)for(let i=0;i<tw;i++){const t=tempF(REG.N-(j+.5)/4,REG.W+(i+.5)/4),k=(j*tw+i)*4;if(t!==t)continue;const col=ramp(TEMP,t);im.data[k]=col[0];im.data[k+1]=col[1];im.data[k+2]=col[2];im.data[k+3]=255;}
+    c.putImageData(im,0,0);}
+
+  let RB,rc;
+  function buildRadar(){
+    if(LIVE.radar){
+      const m=LIVE.radar.m,img=LIVE.radar.img;RB={W:m.W,E:m.E,S:m.S,N:m.N};rc=document.createElement('canvas');rc.width=img.width;rc.height=img.height;
+      const c=rc.getContext('2d');c.drawImage(img,0,0);const im=c.getImageData(0,0,rc.width,rc.height),d=im.data;
+      for(let k=0;k<d.length;k+=4){const col=d[k+3]?step(RAD,d[k]):null;if(!col){d[k+3]=0;continue;}d[k]=col[0];d[k+1]=col[1];d[k+2]=col[2];d[k+3]=235;}
+      c.putImageData(im,0,0);return;
+    }
+    RB={W:-112,E:-80,S:26,N:50,n:20};const rw=(RB.E-RB.W)*RB.n,rh=(RB.N-RB.S)*RB.n;rc=document.createElement('canvas');rc.width=rw;rc.height=rh;
+    const c=rc.getContext('2d'),im=c.createImageData(rw,rh);
+    for(let j=0;j<rh;j++)for(let i=0;i<rw;i++){const col=step(RAD,radarDbz(RB.N-(j+.5)/RB.n,RB.W+(i+.5)/RB.n)),k=(j*rw+i)*4;if(!col)continue;im.data[k]=col[0];im.data[k+1]=col[1];im.data[k+2]=col[2];im.data[k+3]=235;}
+    c.putImageData(im,0,0);}
+
+  redraw=function(){
+    const c=regCv.getContext('2d'),W=regCv.width,H=regCv.height,on=id=>document.getElementById(id).checked;
+    c.globalAlpha=1;c.fillStyle=OCEAN;c.fillRect(0,0,W,H);
+    c.fillStyle=LAND;c.fill(land,'evenodd');
+    c.fillStyle=OCEAN;c.fill(lakes,'evenodd');
+    if(shade){c.save();c.clip(land,'evenodd');c.globalCompositeOperation='overlay';c.globalAlpha=shadeHi?RELIEF.strength:.95;c.imageSmoothingQuality='high';c.drawImage(shade,0,0,W,H);c.restore();c.save();c.clip(lakes,'evenodd');c.fillStyle=OCEAN;c.globalAlpha=1;c.fillRect(0,0,W,H);c.restore();}
+    c.globalAlpha=1;c.globalCompositeOperation='source-over';
+    c.strokeStyle='rgba(190,206,228,.3)';c.lineWidth=1.5;c.stroke(states);
+    c.strokeStyle='rgba(214,226,244,.6)';c.lineWidth=2.4;c.stroke(countries);c.strokeStyle='rgba(214,226,244,.5)';c.lineWidth=1.8;c.stroke(land);c.strokeStyle='rgba(190,206,228,.35)';c.lineWidth=1.2;c.stroke(lakes);
+    if(on('cRad')&&rc){c.imageSmoothingEnabled=true;c.drawImage(rc,X(RB.W),Y(RB.N),(RB.E-RB.W)*REG.ppd,(RB.N-RB.S)*REG.ppd);}
+    if(on('cBarb')){
+      const list=LIVE.asos?LIVE.asos.stations:ST.map(q=>{const wv=sfcWind(q[1],q[2]);return {lat:q[1],lon:q[2],u:wv[0],v:wv[1]};});
+      for(const q of list){drawBarb(c,X(q.lon),Y(q.lat),q.lat,q.u,q.v);
+        c.save();c.translate(X(q.lon),Y(q.lat));c.scale(1/Math.cos(q.lat*D2R),1);c.beginPath();c.arc(0,0,3.6,0,Math.PI*2);c.fillStyle='#fff';c.fill();c.lineWidth=1.5;c.strokeStyle='rgba(5,10,20,.85)';c.stroke();c.restore();}
+    }
+    /* air temperature at a spread of ASOS stations, upper left of the station as on a station plot */
+    if(on('cTemp')&&LIVE.asos){
+      const pick=[];
+      for(const q of LIVE.asos.stations){if(q.t==null)continue;const cc=Math.cos(q.lat*D2R);if(pick.every(k=>Math.hypot((q.lon-k.lon)*cc,q.lat-k.lat)>=3.2))pick.push(q);}
+      c.font='600 32px "Barlow Condensed","Arial Narrow",sans-serif';c.textAlign='right';c.lineJoin='round';
+      for(const q of pick){c.save();c.translate(X(q.lon),Y(q.lat));c.scale(1/Math.cos(q.lat*D2R),1);const tx=String(Math.round(q.t));
+        c.lineWidth=7;c.strokeStyle='rgba(5,10,20,.9)';c.strokeText(tx,-7,-7);c.fillStyle='#ffe7a0';c.fillText(tx,-7,-7);c.restore();}
+      c.textAlign='left';
+    }
+    /* Texas State marker */
+    const mx=X(-97.94),my=Y(29.89);
+    c.save();c.translate(mx,my);c.scale(1/Math.cos(29.89*D2R),1);
+    c.beginPath();c.arc(0,0,7,0,Math.PI*2);c.fillStyle='#c9ad6a';c.fill();c.lineWidth=3;c.strokeStyle='#1a0507';c.stroke();
+    c.font='600 26px "Barlow Condensed",sans-serif';c.lineWidth=5;c.strokeText('TXST',12,9);c.fillStyle='#fff';c.fillText('TXST',12,9);
+    c.restore();
+    regTex.needsUpdate=true;
+  };
+  const zt=iso=>{const d=new Date(iso);return isNaN(d)?'':String(d.getUTCHours()).padStart(2,'0')+String(d.getUTCMinutes()).padStart(2,'0')+'Z';};
+  function labels(){
+    const r=LIVE.rap,a=LIVE.asos,rd=LIVE.radar,demo=[];
+    document.getElementById('jetSrc').textContent=r?'RAP analysis '+zt(r.valid)+', knots; lines are heights':'demo data, knots';if(!r)demo.push('jet stream');
+    document.getElementById('tmpSrc').textContent=a?'ASOS '+zt(a.time)+': wind barbs, temperature \u00b0F':'demo winds';if(!a)demo.push('winds');
+    document.getElementById('radSrc').textContent=rd?'NEXRAD composite '+zt(rd.m.time)+', dBZ':'demo data, dBZ';if(!rd)demo.push('radar');
+    const b=document.getElementById('demoBadge');b.hidden=!demo.length;b.textContent='Demo data: '+demo.join(', ');
+  }
+  function loadLive(){
+    const t='?t='+Date.now(),opt=u=>getJ(u+t).catch(()=>null);
+    return Promise.all([opt('live/rap.json'),opt('live/asos.json'),opt('live/radar.json').then(m=>m?getImg('live/radar.png'+t).then(img=>img?{m,img}:null):null)]).then(([rap,asos,radar])=>{
+      LIVE.rap=rap&&rap.u&&rap.v?rap:null;LIVE.asos=asos&&asos.stations&&asos.stations.length?asos:null;LIVE.radar=radar;
+      buildRadar();redraw();buildJetTexture();buildTethers();labels();jetGroup.visible=document.getElementById('cJet').checked;
+    });
+  }
+  loadLive();setInterval(loadLive,300000);
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(redraw);
+}).catch(()=>{document.getElementById('err').textContent='The map outlines did not load. Reload the page to try again.';});
+
+/* ---------- controls ---------- */
+['cTemp','cBarb','cRad'].forEach(id=>document.getElementById(id).addEventListener('change',()=>redraw()));
+document.getElementById('cJet').addEventListener('change',e=>{jetGroup.visible=e.target.checked;});
+document.getElementById('jetH').addEventListener('input',e=>{jetExag=+e.target.value;document.getElementById('jetHv').textContent=jetExag;setJetHeight();saveView();});
+document.getElementById('copyView').addEventListener('click',e=>{const b=e.currentTarget;try{navigator.clipboard.writeText(viewText()).then(()=>{b.textContent='Copied';},()=>{b.textContent='Read the line above';});}catch(x){b.textContent='Read the line above';}});
+saveView();
+let drag=null,lastTouch=0;
+canvas.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId);});
+canvas.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag={x:e.clientX,y:e.clientY};
+  view.lon-=dx*.12;view.tLon-=dx*.12;view.lat=Math.max(-20,Math.min(40,view.lat+dy*.1));lastTouch=performance.now();});
+canvas.addEventListener('pointerup',()=>{drag=null;saveView();});
+canvas.addEventListener('wheel',e=>{e.preventDefault();view.dist=Math.max(1.5,Math.min(4,view.dist+e.deltaY*.001));saveView();},{passive:false});
+
+/* keep the same east-west framing as a 16:9 full screen, whatever shape the globe panel is */
+function resize(){const w=canvas.clientWidth||2,h=canvas.clientHeight||2;renderer.setSize(w,h,false);camera.aspect=w/h;camera.fov=Math.max(36,Math.min(75,2*Math.atan(Math.tan(18*D2R)*(16/9)*.8/(w/h))/D2R));camera.updateProjectionMatrix();}
+window.addEventListener('resize',resize);if(window.ResizeObserver)new ResizeObserver(resize).observe(canvas);resize();
+if(/[?&]edit\b/.test(location.search))document.body.classList.add('edit');
+
+const calm=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function frame(t){
+  const sway=calm?0:Math.sin(t/14000)*3.5;
+  camera.position.copy(P(view.lat,view.lon+sway,view.dist));
+  camera.up.set(0,1,0);camera.lookAt(P(view.tLat,view.tLon+sway*.4,1));
+  if(jetGroup.visible)stepFlow(true);
+  renderer.render(scene,camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+function tick(){
+  const d=new Date(),f=z=>d.toLocaleTimeString('en-US',{timeZone:z,hour:'2-digit',minute:'2-digit',hour12:false});
+  document.getElementById('tLocal').textContent=d.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit'});
+  document.getElementById('tUtc').textContent=f('UTC').replace(/^24/,'00');
+}
+tick();setInterval(tick,1000);
+})();
+</script>
+<script>
+/* ---------- side panels, ticker, countdown ---------- */
+(function(){
+'use strict';
+const $=id=>document.getElementById(id),Q=new URLSearchParams(location.search),TZ='America/Chicago',PI=Math.PI;
+const CAMPUS={rr:{name:'Round Rock campus',short:'Round Rock',lat:30.5646,lon:-97.6528},sm:{name:'San Marcos campus',short:'San Marcos',lat:29.8884,lon:-97.9384}};
+const STN=CAMPUS.rr,DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+let CFG={lectures:[{campus:'rr',days:['Mon','Wed'],start:'12:30'},{campus:'sm',days:['Tue','Thu'],start:'09:30'}],defaultCampus:'sm',rotateSeconds:20,video:''};
+let ck='sm',C=CAMPUS.sm,FC=null;
+const clock=d=>d&&!isNaN(d)?d.toLocaleTimeString('en-US',{timeZone:TZ,hour:'numeric',minute:'2-digit'}):'none';
+const getJ=u=>fetch(u+(u.includes('?')?'&':'?')+'t='+Date.now()).then(r=>{if(!r.ok)throw new Error(r.status);return r.json();}).catch(()=>null);
+const num=v=>v===''||v==null?NaN:+v,el=(tag,txt,cls)=>{const e=document.createElement(tag);if(txt!=null)e.textContent=txt;if(cls)e.className=cls;return e;};
+function central(){
+  const parts=new Intl.DateTimeFormat('en-US',{timeZone:TZ,weekday:'short',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).formatToParts(new Date()),g=k=>parts.find(x=>x.type===k).value;
+  return {day:g('weekday'),dow:DAYS.indexOf(g('weekday')),secs:(+g('hour')%24)*3600+(+g('minute'))*60+(+g('second'))};
+}
+/* campus follows the day of the week: the campus with a lecture today, otherwise the default. ?campus=rr or ?campus=sm overrides. */
+function pickCampus(){
+  const q=Q.get('campus');let k;
+  if(q)k=/^sm|san/i.test(q)?'sm':'rr';
+  else{const today=central().day,l=(CFG.lectures||[]).find(x=>x.days&&x.days.includes(today)&&CAMPUS[x.campus]);k=l?l.campus:(CAMPUS[CFG.defaultCampus]?CFG.defaultCampus:'sm');}
+  if(k!==ck||!$('campus').textContent){ck=k;C=CAMPUS[k];$('campus').textContent=C.name;$('tickTag').textContent=C.short+' forecast';$('astroSrc').textContent=C.short;ticker();astro();}
+}
+
+/* ---------- sun and moon ---------- */
+function moonDisc(c,cx,cy,r,p){
+  const k=Math.cos(2*PI*p),wax=p<.5;
+  c.beginPath();c.arc(cx,cy,r,0,2*PI);c.fillStyle='#222c3d';c.fill();
+  c.beginPath();c.arc(cx,cy,r,-PI/2,PI/2,!wax);c.ellipse(cx,cy,Math.max(.001,r*Math.abs(k)),r,0,PI/2,-PI/2,wax?k>0:k<0);c.closePath();c.fillStyle='#ece7d2';c.fill();
+}
+function astro(){
+  if(!window.SunCalc)return;
+  const now=new Date(),s=SunCalc.getTimes(now,C.lat,C.lon),m=SunCalc.getMoonTimes(now,C.lat,C.lon),il=SunCalc.getMoonIllumination(now),p=il.phase;
+  $('sunR').textContent=clock(s.sunrise);$('sunS').textContent=clock(s.sunset);
+  const mins=Math.round((s.sunset-s.sunrise)/6e4);$('dayLen').textContent=mins>0?'Daylight '+Math.floor(mins/60)+' h '+(mins%60)+' min':'';
+  /* about once a month the moon does not rise or set within a calendar day; show the next one, with its day */
+  const nextMoon=k=>{if(m[k])return clock(m[k]);for(let i=1;i<=2;i++){const d=new Date(now.getTime()+i*864e5),q=SunCalc.getMoonTimes(d,C.lat,C.lon);if(q[k])return clock(q[k])+' '+q[k].toLocaleDateString('en-US',{timeZone:TZ,weekday:'short'});}return 'none';};
+  $('moonR').textContent=nextMoon('rise');$('moonS').textContent=nextMoon('set');
+  const names=['New','Waxing crescent','First quarter','Waxing gibbous','Full','Waning gibbous','Last quarter','Waning crescent'];
+  const idx=p<.03||p>.97?0:p<.22?1:p<.28?2:p<.47?3:p<.53?4:p<.72?5:p<.78?6:7;
+  $('moonP').textContent=names[idx]+', '+Math.round(il.fraction*100)+'% lit';
+  const mi=$('moonIcon').getContext('2d');mi.clearRect(0,0,64,64);moonDisc(mi,32,32,28,p);
+
+  /* the scene: the curve of the Earth with the sun on its arc from sunrise to sunset */
+  const cv=$('sky'),W=cv.clientWidth,H=cv.clientHeight;if(!W||!H)return;
+  const dpr=Math.min(window.devicePixelRatio||1,2);cv.width=W*dpr;cv.height=H*dpr;const c=cv.getContext('2d');c.scale(dpr,dpr);
+  const alt=SunCalc.getPosition(now,C.lat,C.lon).altitude,dayness=Math.max(0,Math.min(1,(alt+.1)/.3)),twi=Math.max(0,1-Math.abs(alt)/.14);
+  const mix=(a,b,t)=>'rgb('+a.map((v,i)=>Math.round(v+(b[i]-v)*t)).join(',')+')';
+  const sky=c.createLinearGradient(0,0,0,H);sky.addColorStop(0,mix([4,8,20],[24,74,140],dayness));sky.addColorStop(1,mix([14,26,52],[108,168,224],dayness));
+  c.fillStyle=sky;c.fillRect(0,0,W,H);
+  if(dayness<.6){c.fillStyle='rgba(255,255,255,'+(.75*(1-dayness/.6)).toFixed(2)+')';for(let i=0;i<70;i++){const hx=Math.sin(i*127.1)*43758.5453,hy=Math.sin(i*311.7)*43758.5453;c.fillRect((hx-Math.floor(hx))*W,(hy-Math.floor(hy))*H*.7,1.3,1.3);}}
+  const R=W*1.25,ecx=W/2,ecy=H*.74+R,limb=x=>ecy-Math.sqrt(Math.max(0,R*R-(x-ecx)*(x-ecx))),xl=W*.2,xr=W*.8,peak=H*.5;
+  const pos=f=>{const x=xl+f*(xr-xl);return [x,limb(x)-Math.sin(PI*f)*peak];};
+  if(twi>0){const g=c.createRadialGradient(alt<0?(now<s.sunrise||now>s.sunset&&now.getHours()<12?xl:xr):W/2,H*.74,0,W/2,H*.74,W*.6);g.addColorStop(0,'rgba(255,150,70,'+(.5*twi).toFixed(2)+')');g.addColorStop(1,'rgba(255,150,70,0)');c.fillStyle=g;c.fillRect(0,0,W,H);}
+  c.setLineDash([4,6]);c.strokeStyle='rgba(255,226,150,.6)';c.lineWidth=1.5;c.beginPath();for(let i=0;i<=40;i++){const q=pos(i/40);i?c.lineTo(q[0],q[1]):c.moveTo(q[0],q[1]);}c.stroke();c.setLineDash([]);
+  const f=(now-s.sunrise)/(s.sunset-s.sunrise);
+  if(f>=0&&f<=1){const q=pos(f),g=c.createRadialGradient(q[0],q[1],0,q[0],q[1],H*.34);g.addColorStop(0,'rgba(255,236,170,.95)');g.addColorStop(.25,'rgba(255,205,90,.55)');g.addColorStop(1,'rgba(255,205,90,0)');c.fillStyle=g;c.fillRect(q[0]-H*.4,q[1]-H*.4,H*.8,H*.8);c.beginPath();c.arc(q[0],q[1],H*.075,0,2*PI);c.fillStyle='#fff3c4';c.fill();}
+  else{const ma=SunCalc.getMoonPosition(now,C.lat,C.lon).altitude;if(ma>0){let mf=.65;if(m.rise&&m.set&&m.set>m.rise&&now>=m.rise&&now<=m.set)mf=(now-m.rise)/(m.set-m.rise);const q=pos(Math.max(.08,Math.min(.92,mf)));moonDisc(c,q[0],q[1],H*.07,p);}}
+  /* the Earth: a dark limb with a thin band of atmosphere */
+  c.save();c.shadowColor='rgba(120,190,255,.9)';c.shadowBlur=H*.12;c.beginPath();c.arc(ecx,ecy,R,0,2*PI);c.fillStyle='#07101d';c.fill();c.restore();
+  c.beginPath();c.arc(ecx,ecy,R,0,2*PI);c.strokeStyle='rgba(150,205,255,.85)';c.lineWidth=1.5;c.stroke();
+  for(const x of [xl,xr]){c.beginPath();c.arc(x,limb(x),3.5,0,2*PI);c.fillStyle='#ffd98a';c.fill();}
+}
+
+/* ---------- countdown to the next lecture ---------- */
+function countdown(){
+  const box=$('countdown'),n=central();let best=null;
+  if(/^\d{1,2}:\d{2}$/.test(Q.get('start')||'')){const a=Q.get('start').split(':');let d=(+a[0])*3600+(+a[1])*60-n.secs;if(d<-300)d+=86400;best={d,campus:ck,start:Q.get('start'),day:n.day};}
+  else for(const l of CFG.lectures||[]){if(!/^\d{1,2}:\d{2}$/.test(l.start||''))continue;const a=l.start.split(':'),st=(+a[0])*3600+(+a[1])*60;
+    for(const dy of l.days||[]){const di=DAYS.indexOf(dy);if(di<0)continue;let d=((di-n.dow+7)%7)*86400+st-n.secs;if(d<-300)d+=7*86400;if(!best||d<best.d)best={d,campus:l.campus,start:l.start,day:dy};}}
+  if(!best){box.hidden=true;return;}
+  box.hidden=false;const d=best.d,hh=Math.floor(d/3600),mm=Math.floor(d%3600/60),ss=d%60,p2=v=>String(v).padStart(2,'0');
+  if(d<=0)box.textContent='Lecture is starting';
+  else{const days=Math.floor(d/86400),h2=Math.floor(d%86400/3600);box.textContent='Next lecture in '+(days?days+(days>1?' days ':' day '):'')+(days||h2?h2+':'+p2(mm):mm)+':'+p2(ss)+'  \u00b7  '+((CAMPUS[best.campus]||C).short);}
+}
+
+/* ---------- Round Rock station meteogram, in the style of the Oklahoma Mesonet meteograms ---------- */
+const F=c=>c*9/5+32,dewC=(t,rh)=>{const a=Math.log(Math.max(rh,1)/100)+17.625*t/(243.04+t);return 243.04*a/(17.625-a);};
+const compass=d=>['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'][Math.round(d/22.5)%16];
+const MC={temp:'#d9706c',dew:'#3f8f4a',wind:'#4d5fd6',gust:'#a9adff',dir:'#d6d04a',pres:'#b07a45',sun:'#ff9a33',max:'#5d6673'};
+let ROWS=[],CUR={};
+function station(d){
+  if(!d||!d.series||!d.series.values){$('stnSrc').textContent='no data yet';return;}
+  ROWS=d.series.values.map(v=>{const t=num(v.airTemp),rh=num(v.humidity),tm=new Date(v.dateTime);let mx=0;
+    if(window.SunCalc&&!isNaN(tm)){const cz=Math.sin(SunCalc.getPosition(tm,STN.lat,STN.lon).altitude);mx=cz>0?1098*cz*Math.exp(-.057/cz):0;}
+    return {t:tm,T:F(t),Td:F(dewC(t,rh)),ws:num(v.windSpeed10m!==''&&v.windSpeed10m!=null?v.windSpeed10m:v.windSpeed)*2.23694,gust:num(v.windGust10m)*2.23694,wd:num(v.windDirection10m!==''&&v.windDirection10m!=null?v.windDirection10m:v.windDirection),p:num(v.airPressure),sr:num(v.solarRadiation),mx};}).filter(r=>!isNaN(r.t)).sort((a,b)=>a.t-b.t);
+  const c=d.current||{},last=ROWS[ROWS.length-1]||{},t=num(c.airTemp),rh=num(c.humidity);
+  CUR={T:t===t?F(t):last.T,Td:t===t&&rh===rh?F(dewC(t,rh)):last.Td,ws:num(c.windSpeed)===num(c.windSpeed)?num(c.windSpeed)*2.23694:last.ws,gust:num(c.windGust)===num(c.windGust)?num(c.windGust)*2.23694:last.gust,
+       wd:num(c.windDirection10m)===num(c.windDirection10m)?num(c.windDirection10m):last.wd,p:last.p,sr:num(c.solarRadiation)===num(c.solarRadiation)?num(c.solarRadiation):last.sr};
+  $('stnSrc').textContent='TexMesonet, '+clock(new Date(c.recordedTime||last.t));
+  drawMeteo();
+}
+function niceTicks(lo,hi,target){
+  if(!(hi>lo)){lo-=1;hi+=1;}
+  const raw=(hi-lo)/(target||3),mag=Math.pow(10,Math.floor(Math.log10(raw))),n=raw/mag,st=(n<=1?1:n<=2?2:n<=5?5:10)*mag,a=Math.floor(lo/st)*st,b=Math.ceil(hi/st)*st,out=[];
+  for(let v=a;v<=b+st*.01;v+=st)out.push(+v.toFixed(6));return out;
+}
+function drawMeteo(){
+  const cv=$('meteo'),W=cv.clientWidth,H=cv.clientHeight;if(!W||!H||!ROWS.length)return;
+  const dpr=Math.min(window.devicePixelRatio||1,2);cv.width=W*dpr;cv.height=H*dpr;const c=cv.getContext('2d');c.scale(dpr,dpr);
+  const css=getComputedStyle(document.documentElement),TEXT=css.getPropertyValue('--text').trim(),MUTED=css.getPropertyValue('--muted').trim(),GRID='rgba(160,185,220,.16)',FRAME='rgba(160,185,220,.4)';
+  const fs=Math.max(10,parseFloat(getComputedStyle(document.body).fontSize)*.72),body=fs+'px Barlow, Arial, sans-serif',big='600 '+(fs*1.5)+'px "Barlow Condensed","Arial Narrow",sans-serif';
+  const padL=fs*4.9,tickR=fs*2.3,curW=fs*9.4,padR=tickR+curW,padT=fs*1.4,gap=fs*.55,t1=ROWS[ROWS.length-1].t.getTime(),t0=t1-864e5,pw=W-padL-padR,x=t=>padL+(t-t0)/(t1-t0)*pw;
+  const rows=ROWS.filter(r=>r.t>=t0),ph=(H-padT-gap*3)/4,bw=Math.max(1,pw/Math.max(rows.length,96)*.86);
+  const hours=[];{const d=new Date(t0);d.setMinutes(0,0,0);for(let t=d.getTime();t<=t1;t+=36e5){const h=+new Intl.DateTimeFormat('en-US',{timeZone:TZ,hour:'numeric',hour12:false}).format(new Date(t))%24;if(t>=t0&&h%3===0)hours.push([t,h]);}}
+  c.textBaseline='middle';c.lineJoin='round';
+  const area=(y,k,col,base)=>{const pts=rows.filter(r=>r[k]===r[k]);if(!pts.length)return;c.beginPath();c.moveTo(x(pts[0].t),base);for(const r of pts)c.lineTo(x(r.t),y(r[k]));c.lineTo(x(pts[pts.length-1].t),base);c.closePath();c.fillStyle=col;c.fill();};
+  const bars=(y,k,col,base)=>{c.fillStyle=col;for(const r of rows){const v=r[k];if(v===v)c.fillRect(x(r.t)-bw,y(v),bw,base-y(v));}};
+  const panels=[
+    {titles:[['Air temp',MC.temp],['Dew point',MC.dew]],range:()=>{const v=rows.flatMap(r=>[r.T,r.Td]).filter(q=>q===q);return niceTicks(Math.min(...v)-1,Math.max(...v)+1,6);},
+     draw:(y,b)=>{area(y,'T',MC.temp,b);area(y,'Td',MC.dew,b);},cur:[[Math.round(CUR.T)+'°F','Temperature',MC.temp],[Math.round(CUR.Td)+'°F','Dew point',MC.dew]]},
+    {titles:[['Wind, gust',MC.gust],['Direction',MC.dir]],range:()=>niceTicks(0,Math.max(4,...rows.map(r=>r.gust===r.gust?r.gust:r.ws).filter(q=>q===q)),4),dirAxis:true,
+     draw:(y,b,y0)=>{bars(y,'gust',MC.gust,b);bars(y,'ws',MC.wind,b);c.strokeStyle=MC.dir;c.lineWidth=1.3;for(const r of rows){if(r.wd===r.wd&&r.ws>=.5){c.beginPath();c.arc(x(r.t)-bw/2,b-(r.wd/360)*(b-y0),Math.max(1.8,fs*.2),0,2*PI);c.stroke();}}},
+     cur:[[CUR.ws<1?'Calm':compass(CUR.wd)+' '+Math.round(CUR.ws)+' mph','Wind',MC.wind],[Math.round(CUR.gust)+' mph','Gust',MC.gust]]},
+    {titles:[['Sea-level',MC.pres]],range:()=>{const v=rows.map(r=>r.p).filter(q=>q===q);return niceTicks(Math.min(...v)-.5,Math.max(...v)+.5,3);},
+     draw:(y,b)=>area(y,'p',MC.pres,b),cur:[[Math.round(CUR.p)+' mb','Sea-level pressure',MC.pres]]},
+    {titles:[['Solar',MC.sun],['Clear sky','#9aa3b0']],range:()=>niceTicks(0,Math.max(200,...rows.map(r=>Math.max(r.sr||0,r.mx||0))),4),
+     draw:(y,b)=>{area(y,'mx',MC.max,b);area(y,'sr',MC.sun,b);},cur:[[Math.round(CUR.sr)+' W/m²','Sunlight',MC.sun]]}];
+  panels.forEach((p,pi)=>{
+    const y0=padT+pi*(ph+gap),y1=y0+ph,tk=p.range(),lo=tk[0],hi=tk[tk.length-1],y=v=>y1-(Math.min(hi,Math.max(lo,v))-lo)/(hi-lo)*(y1-y0);
+    c.save();c.beginPath();c.rect(padL,y0,pw,y1-y0);c.clip();p.draw(y,y1,y0);
+    c.strokeStyle=GRID;c.lineWidth=1;for(const v of tk){c.beginPath();c.moveTo(padL,y(v));c.lineTo(W-padR,y(v));c.stroke();}
+    for(const hr of hours){c.beginPath();c.moveTo(x(hr[0]),y0);c.lineTo(x(hr[0]),y1);c.stroke();}c.restore();
+    c.strokeStyle=FRAME;c.lineWidth=1;c.strokeRect(padL+.5,y0+.5,pw-1,y1-y0-1);
+    c.font=body;c.fillStyle=MUTED;const skip=Math.ceil(tk.length*fs*1.05/(y1-y0));
+    c.textAlign='left';tk.forEach((v,i)=>{if(i%skip===0)c.fillText(String(v),W-padR+fs*.35,Math.min(y1-fs*.45,Math.max(y0+fs*.45,y(v))));});
+    c.textAlign='right';
+    if(p.dirAxis)[['N',0],['E',90],['S',180],['W',270],['N',360]].forEach(q=>c.fillText(q[0],padL-fs*.35,Math.min(y1-fs*.45,Math.max(y0+fs*.45,y1-(q[1]/360)*(y1-y0)))));
+    else tk.forEach((v,i)=>{if(i%skip===0)c.fillText(String(v),padL-fs*.35,Math.min(y1-fs*.45,Math.max(y0+fs*.45,y(v))));});
+    p.titles.forEach((t,i)=>{c.save();c.translate(fs*(.75+i*1.15),(y0+y1)/2);c.rotate(-PI/2);c.textAlign='center';c.font=(fs*.86)+'px Barlow, Arial, sans-serif';c.fillStyle=t[1];c.fillText(t[0],0,0);c.restore();});
+    c.fillStyle=MUTED;c.textAlign='center';for(const hr of hours)if(pi===0)c.fillText(String(hr[1]).padStart(2,'0'),x(hr[0]),padT-fs*.7);
+    const cx=W-curW+fs*.5,n=p.cur.length,lh=Math.min(fs*2.9,(y1-y0)/n),top=(y0+y1)/2-lh*n/2;
+    p.cur.forEach((q,i)=>{const cy=top+lh*(i+.5);c.fillStyle=q[2];c.fillRect(cx,cy-lh*.36,3,lh*.72);c.textAlign='left';c.font=body;c.fillStyle=MUTED;c.fillText(q[1],cx+fs*.6,cy-fs*.72);c.font=big;c.fillStyle=TEXT;c.fillText(q[0],cx+fs*.6,cy+fs*.55);});
+  });
+}
+window.addEventListener('resize',()=>{drawMeteo();astro();});if(document.fonts&&document.fonts.ready)document.fonts.ready.then(drawMeteo);
+
+/* ---------- forecast ticker for today's campus ---------- */
+function ticker(d){
+  if(d)FC=d;const box=$('tick'),list=FC&&FC[ck];if(!list||!list.length){box.textContent='The forecast is not available yet';return;}
+  box.textContent='';
+  for(const p of list){const s=el('span');s.appendChild(el('b',p.name));s.appendChild(document.createTextNode((p.day?'High ':'Low ')+p.temp+'°  '+p.text+(p.pop>=20?'  ('+p.pop+'% chance of precipitation)':'')));box.appendChild(s);}
+  box.appendChild(el('span','Forecast: National Weather Service'));
+  box.style.animationDuration=Math.max(40,Math.round(box.scrollWidth/(window.innerWidth*.055)))+'s';
+}
+
+/* ---------- rotating panel ---------- */
+const OKM='https://data.mesonet.org/data/public/noaa/metar/maps/realtime/';
+let slides=[],cur=-1,timer=null,sig='';
+function videoNode(u){
+  const m=/(?:youtu\.be\/|[?&]v=|\/embed\/|\/shorts\/)([\w-]{11})/.exec(u);
+  if(m){const f=document.createElement('iframe');f.src='https://www.youtube.com/embed/'+m[1]+'?autoplay=1&mute=1&loop=1&controls=0&playlist='+m[1];f.allow='autoplay; encrypted-media';f.title='Video';return f;}
+  const v=document.createElement('video');v.src=u;v.muted=true;v.loop=true;v.autoplay=true;v.playsInline=true;v.style.maxWidth='100%';v.style.maxHeight='100%';return v;
+}
+function buildSlides(img,news){
+  const have=(img&&img.have)||[],defs=[],bust=u=>u+(u.includes('?')?'&':'?')+(u.startsWith('http')?'cache_bust=':'t=')+Date.now();
+  /* images are shown two at a time, side by side, so the wide card is filled without cropping */
+  const p1=[];if(have.includes('sat.gif'))p1.push({cap:'GOES-East GeoColor satellite',img:'live/sat.gif'});if(have.includes('wpc.jpg'))p1.push({cap:'Fronts and weather, Weather Prediction Center',img:'live/wpc.jpg'});
+  if(p1.length)defs.push({title:p1.length>1?'Satellite and fronts':p1[0].cap,src:'NOAA, NWS',figs:p1});
+  defs.push({title:'Dew point and altimeter',src:'Oklahoma Mesonet',figs:[{cap:'Dew point',img:OKM+'latest.tdew.png'},{cap:'Altimeter setting',img:OKM+'latest.pres.png'}]});
+  if(news&&news.items&&news.items.length)defs.push({title:'Weather headlines',src:'NWS alerts, RAP, TexMesonet',items:news.items.slice(0,5)});
+  if(CFG.video)defs.push({title:'Video',src:'',video:CFG.video});
+  const ns=JSON.stringify(defs);
+  if(ns===sig){slides.forEach(s=>{if(s.def.figs){s.bad=false;s.node.querySelectorAll('figure').forEach((f,i)=>{f.hidden=false;f.firstChild.src=bust(s.def.figs[i].img);});}});return;}
+  sig=ns;const wrap=$('slides'),dots=$('dots');wrap.textContent='';dots.textContent='';
+  slides=defs.map(def=>{const n=el('div',null,'slide'),s={def,node:n,bad:false};
+    if(def.figs){n.classList.add('pair');def.figs.forEach(f=>{const fg=el('figure'),im=el('img');im.alt=f.cap;
+      im.onerror=()=>{fg.hidden=true;s.bad=[...n.querySelectorAll('figure')].every(q=>q.hidden);};im.src=bust(f.img);fg.appendChild(im);fg.appendChild(el('figcaption',f.cap));n.appendChild(fg);});}
+    else if(def.items){const ul=el('ul');def.items.forEach(q=>ul.appendChild(el('li',q)));n.appendChild(ul);}
+    else if(def.video)n.appendChild(videoNode(def.video));
+    wrap.appendChild(n);dots.appendChild(el('i'));return s;});
+  cur=-1;show();clearInterval(timer);timer=setInterval(show,Math.max(8,+CFG.rotateSeconds||20)*1000);
+}
+function show(){
+  if(!slides.length)return;for(let k=0;k<slides.length;k++){cur=(cur+1)%slides.length;if(!slides[cur].bad)break;}
+  slides.forEach((s,i)=>s.node.classList.toggle('on',i===cur));[...$('dots').children].forEach((d,i)=>d.classList.toggle('on',i===cur));
+  $('rotTitle').textContent=slides[cur].def.title;$('rotSrc').textContent=slides[cur].def.src;
+}
+
+function refresh(){
+  return Promise.all([getJ('config.json'),getJ('live/station.json'),getJ('live/forecast.json'),getJ('live/images.json'),getJ('live/headlines.json')]).then(([cfg,st,fc,img,news])=>{
+    if(cfg)CFG=Object.assign(CFG,cfg);pickCampus();station(st);ticker(fc);buildSlides(img,news);astro();
+  });
+}
+pickCampus();refresh();setInterval(refresh,300000);setInterval(()=>{countdown();},1000);setInterval(()=>{pickCampus();astro();},60000);countdown();
+})();
+</script>
+</body>
+</html>
